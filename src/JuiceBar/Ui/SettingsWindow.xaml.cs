@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows;
 using JuiceBar.Core;
 using JuiceBar.Core.Platform;
+using JuiceBar.Core.Diagnostics;
 using JuiceBar.Core.Power;
 using JuiceBar.Core.Storage;
 using JuiceBar.Core.Update;
@@ -231,6 +232,121 @@ public partial class SettingsWindow : Window
     {
         double total = _channels.Where(c => c.IsSelected).Sum(c => c.Watts);
         ChannelTotal.Text = $"{total:N1} W";
+    }
+
+    // ─────────────────────── 진단 정보 ───────────────────────
+
+    /// <summary>이슈를 여는 곳. 붙여 넣을 곳까지 데려다 준다.</summary>
+    private const string IssuesUrl = "https://github.com/writingdeveloper/JuiceBar/issues/new";
+
+    /// <summary>
+    /// 지금 이 PC 의 측정 상태를 그대로 담아 클립보드에 넣는다.
+    ///
+    /// 전력 측정이 되는지는 기기마다 갈리는데, 그걸 대화로 하나씩 물어보면 서로 지친다.
+    /// 공개된 곳에 붙여 넣을 글이므로 담기는 내용은 좁게 잡았다 — 무엇이 담기지 않는지는
+    /// DiagnosticReport 쪽에 적어 두었다.
+    /// </summary>
+    private void OnCopyDiagnostics(object sender, RoutedEventArgs e)
+    {
+        string report;
+
+        try
+        {
+            report = DiagnosticReport.Build(CollectDiagnostics());
+        }
+        catch (Exception ex)
+        {
+            ValidationText.Text = Loc.T("settings.diagnosticsFailed", ex.Message);
+            return;
+        }
+
+        if (!TrySetClipboard(report))
+        {
+            ValidationText.Text = Loc.T("settings.diagnosticsFailed", Loc.T("wizard.copyFailed"));
+            return;
+        }
+
+        // 성공을 아래쪽 경고 자리에 띄우면 색부터 틀린 신호를 준다.
+        // 요금 마법사와 같이 버튼 글자를 잠깐 바꿔서 눌렸다는 것만 알린다.
+        ValidationText.Text = string.Empty;
+        CopyDiagnosticsButton.Content = Loc.T("wizard.copied");
+
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            CopyDiagnosticsButton.Content = Loc.T("settings.copyDiagnostics");
+        };
+        timer.Start();
+    }
+
+    private DiagnosticInput CollectDiagnostics()
+    {
+        var profile = _metering.Profile;
+        var latest = _metering.Latest;
+        var power = latest?.Power;
+
+        return new DiagnosticInput
+        {
+            AppVersion = UpdateService.CurrentVersion.ToString(),
+            WindowsRelease = JuiceBar.Core.Platform.WindowsRelease.Describe(),
+            HasEnergyMeter = _metering.HasEnergyMeter,
+            DriverInstalled = PawnIoDetector.IsInstalled(),
+            IsElevated = Elevation.IsElevated,
+            HasBattery = profile.HasBattery,
+            Channels = power?.Channels ?? [],
+            SelectedChannelIds = profile.SelectedChannelIds,
+            Quality = power?.Quality ?? PowerQuality.Estimated,
+            WallWatts = power?.WallWatts ?? 0,
+            MeasuredWatts = power?.MeasuredWatts ?? 0,
+            BaselineWatts = profile.Calibration.BaselineWatts,
+            Efficiency = profile.Calibration.Efficiency,
+            IsCalibrated = profile.Calibration.IsCalibrated,
+            Language = profile.Language,
+            RateKind = profile.Tariff.Rate switch
+            {
+                Core.Tariff.TieredRate => "tiered",
+                Core.Tariff.TouRate => "tou",
+                _ => "flat",
+            },
+        };
+    }
+
+    private void OnOpenIssues(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = IssuesUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception)
+        {
+            // 기본 브라우저가 없거나 정책이 막았다. 주소는 README 에도 있다.
+        }
+    }
+
+    /// <summary>
+    /// 클립보드는 다른 프로그램이 잡고 있으면 실패한다. 몇 번 다시 시도한다.
+    /// </summary>
+    private static bool TrySetClipboard(string text)
+    {
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                System.Windows.Clipboard.SetText(text);
+                return true;
+            }
+            catch (Exception)
+            {
+                Thread.Sleep(60);
+            }
+        }
+
+        return false;
     }
 
     private static string ProfileDirectory()

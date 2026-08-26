@@ -80,6 +80,9 @@ public sealed class MeteringService : IDisposable
 
         _currentMinute = FloorToMinute(DateTimeOffset.UtcNow);
 
+        // 하루를 채우지 않고 껐다 켜는 사람도 있다. 시작하고 첫 분이 넘어갈 때 한 번 돈다.
+        _lastPrune = DateTimeOffset.MinValue;
+
         MigrateProfile();
     }
 
@@ -342,6 +345,37 @@ public sealed class MeteringService : IDisposable
 
         FlushMinute();
         _currentMinute = minute;
+
+        PruneOldHistory(now);
+    }
+
+    /// <summary>
+    /// 이보다 오래된 기록은 지운다.
+    ///
+    /// 1분에 한 행이면 1년에 52만 행이다. 그대로 두면 DB 가 끝없이 커지는데,
+    /// 지난 요금을 되짚어 보는 데 1년치면 넉넉하고 그 이상을 쓰는 화면도 없다.
+    /// </summary>
+    private static readonly TimeSpan HistoryRetention = TimeSpan.FromDays(400);
+
+    private DateTimeOffset _lastPrune;
+
+    /// <summary>
+    /// 하루에 한 번만 훑는다. 매 분 DELETE 를 날려 봐야 지울 것도 거의 없다.
+    /// </summary>
+    private void PruneOldHistory(DateTimeOffset now)
+    {
+        if (now - _lastPrune < TimeSpan.FromDays(1)) return;
+
+        _lastPrune = now;
+
+        try
+        {
+            _history.Prune(now - HistoryRetention);
+        }
+        catch (Exception)
+        {
+            // 정리에 실패했다고 계측이 멈추면 안 된다. 다음 날 다시 시도한다.
+        }
     }
 
     private void FlushMinute()

@@ -1,0 +1,50 @@
+name: The reading looks wrong
+description: Power, cost, or the CPU share is off on your machine
+labels: ["measurement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Whether power can be measured at all depends on the exact machine —
+        which CPU, which Windows, whether the energy meter is exposed, whether
+        the driver is installed. Rather than work through that by hand, let
+        JuiceBar answer it in one go.
+
+        **Settings → Advanced → Copy diagnostics**, then paste it below.
+
+        It carries no computer name, no file paths, and no usage or prices.
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste the block from Settings → Advanced → Copy diagnostics.
+      placeholder: |
+        ### JuiceBar diagnostics
+        ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What looks wrong
+      description: >
+        What does JuiceBar show, and what did you expect? If you have a
+        wattmeter or a smart plug reading, that number is the most useful thing
+        you can give us.
+      placeholder: |
+        JuiceBar says 95 W at idle. My smart plug reads 140 W.
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: Anything unusual about the machine
+      description: >
+        Two graphics cards, an external GPU, a laptop dock, an undervolt — the
+        kind of thing that makes a machine different from the common case.
+      placeholder: Laptop with the dGPU disabled in BIOS
+    validations:
+      required: false

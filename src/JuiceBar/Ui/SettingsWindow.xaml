@@ -262,6 +262,30 @@
                             </StackPanel>
                         </Border>
 
+                        <!--
+                            문제를 신고할 때 붙여 넣을 정보.
+                            기기마다 사정이 달라 대화로 하나씩 물어보면 서로 지친다.
+                        -->
+                        <Border Style="{StaticResource Card}" Margin="0,10,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource LabelText}"
+                                           FontWeight="Normal"
+                                           TextWrapping="Wrap"
+                                           Text="{ui:Translate settings.diagnosticsHint}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button x:Name="CopyDiagnosticsButton"
+                                            Content="{ui:Translate settings.copyDiagnostics}"
+                                            Style="{StaticResource SubtleButton}"
+                                            Click="OnCopyDiagnostics" />
+                                    <Button Content="{ui:Translate settings.openIssues}"
+                                            Style="{StaticResource SubtleButton}"
+                                            Margin="8,0,0,0"
+                                            Click="OnOpenIssues" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <TextBlock x:Name="ProfilePathText"
                                    Style="{StaticResource LabelText}"
                                    FontWeight="Normal"

@@ -166,6 +166,52 @@ cycle started and leaves earlier cycles alone.
 
 ---
 
+## When the reading looks wrong
+
+It might be. Whether power can be measured at all comes down to the exact
+machine — which CPU, which Windows, whether the energy meter is exposed,
+whether the driver is there. Only one of those is visible from the outside, and
+working through the rest over a comment thread is miserable for everyone.
+
+So JuiceBar answers it itself. **Settings → Advanced → Copy diagnostics** puts a
+block on your clipboard:
+
+```
+### JuiceBar diagnostics
+
+| | |
+|---|---|
+| JuiceBar | 1.4.0 |
+| Windows | Windows 11 Pro 25H2 (build 26200) |
+| Energy meter | available |
+| PawnIO driver | installed |
+| Elevated | no |
+| Measurement | sensors, not calibrated |
+| Reading | 146.8 W at the wall, 94.2 W from sensors |
+
+Power channels — `*` marks the ones being summed:
+
+*    62.2 W  Cpu      CPU Package         Energy Meter (Microsoft PPM)
+*    32.0 W  Gpu      GPU Package         NVIDIA GeForce RTX 4080 SUPER
+     30.0 W  Gpu      GPU Core            AMD Radeon(TM) Graphics
+     11.0 W  Gpu      GPU SoC             AMD Radeon(TM) Graphics
+      0.0 W  Cpu      Package             AMD Ryzen 9 7950X
+```
+
+Paste it into [a new issue](https://github.com/writingdeveloper/JuiceBar/issues/new/choose)
+and that is usually enough to tell what happened. In the sample above you can
+read the whole story: the meter is doing the work, the driver is installed but
+idle because nothing is elevated, and the integrated GPU is being left out
+because its 41 W already sits inside the package.
+
+**It carries nothing that identifies you or your machine** — no computer name,
+no device id, no file paths, no usage figures, and no electricity prices. Only
+the tariff *kind* is included, because prices would narrow down where you live
+and are no help with a measurement bug. If a wattmeter or smart plug disagrees
+with JuiceBar, that number is the single most useful thing you can add.
+
+---
+
 ## Languages
 
 English, 한국어, 日本語, 简体中文, Español and Deutsch. JuiceBar follows your
