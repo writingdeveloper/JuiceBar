@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using JuiceBar.Core;
 using JuiceBar.Core.Tariff;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar.Ui;
 
@@ -57,18 +58,18 @@ public partial class RateWizardWindow : Window
     {
         if (!TrySetClipboard(CurrentPrompt()))
         {
-            ShowResult("클립보드에 복사하지 못했습니다. 아래 상자의 내용을 직접 선택해 복사해 주세요.", isError: true);
+            ShowResult(Loc.T("wizard.copyFailed"), isError: true);
             return;
         }
 
-        CopyButton.Content = "복사됨 ✓";
+        CopyButton.Content = Loc.T("wizard.copied");
 
         // 잠깐 뒤에 원래 글자로 돌려놓는다. 눌렸다는 것만 알려주면 된다.
         var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         timer.Tick += (_, _) =>
         {
             timer.Stop();
-            CopyButton.Content = "프롬프트 복사";
+            CopyButton.Content = Loc.T("wizard.copy");
         };
         timer.Start();
     }
@@ -119,23 +120,71 @@ public partial class RateWizardWindow : Window
             // 클립보드를 못 읽으면 사용자가 직접 붙여 넣은 내용으로 진행한다.
         }
 
-        OnApply(sender, e);
+        // Text 를 바꾸면 아래 debounce 가 걸리지만, 버튼을 눌렀을 때는 바로 보여 주는 편이 낫다.
+        Parse();
     }
 
-    private void OnApply(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// 붙여 넣자마자 알아서 읽는다.
+    ///
+    /// 예전에는 "적용" 을 따로 눌러야 했는데, 붙여 넣고 바로 저장을 누르는 것이
+    /// 훨씬 자연스러운 행동이라 아무 일도 일어나지 않는 것처럼 보였다.
+    /// 타이핑 중에 매 글자마다 오류를 띄우지 않도록 잠깐 기다렸다가 읽는다.
+    /// </summary>
+    private void OnResponseChanged(object sender, TextChangedEventArgs e)
     {
+        if (_suppressParse) return;
+
+        _parseDelay ??= CreateParseTimer();
+
+        _parseDelay.Stop();
+        _parseDelay.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _parseDelay;
+    private bool _suppressParse;
+
+    private System.Windows.Threading.DispatcherTimer CreateParseTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(400),
+        };
+
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            Parse();
+        };
+
+        return timer;
+    }
+
+    /// <summary>입력란의 내용을 읽어 인식 결과나 오류를 보여 준다.</summary>
+    private bool Parse()
+    {
+        _parseDelay?.Stop();
+
+        if (string.IsNullOrWhiteSpace(ResponseBox.Text))
+        {
+            _parsed = null;
+            return false;
+        }
+
         var result = RatePrompt.TryParse(ResponseBox.Text);
 
         if (!result.Success)
         {
             _parsed = null;
-            ShowResult(result.Error ?? "답변을 읽지 못했습니다.", isError: true);
-            return;
+            ShowResult(result.Error ?? Loc.T("rate.error.noJson"), isError: true);
+            return false;
         }
 
         _parsed = result.Tariff;
         BudgetUnit.Text = _parsed!.Symbol;
         ShowResult(Describe(_parsed), isError: false);
+
+        return true;
     }
 
     /// <summary>
@@ -152,12 +201,17 @@ public partial class RateWizardWindow : Window
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
 
+        // 여기서 넣은 글은 이미 유효한 값이라 다시 읽어 인식 결과를 덮어쓸 필요가 없다.
+        _suppressParse = true;
         ResponseBox.Text = JsonSerializer.Serialize(_parsed ?? _metering.Profile.Tariff, options);
-        ShowResult("지금 설정된 요금입니다. 값을 고친 뒤 '입력한 내용으로 적용'을 누르세요.", isError: false);
+        _suppressParse = false;
+
+        _parsed ??= _metering.Profile.Tariff;
+        ShowResult(Loc.T("wizard.exportedHint"), isError: false);
     }
 
     private static string Describe(TariffConfig tariff)
-        => "인식됨 — " + TariffSummary.Describe(tariff);
+        => Loc.T("wizard.recognized", TariffSummary.Describe(tariff));
 
     private void ShowResult(string message, bool isError)
     {
@@ -173,18 +227,23 @@ public partial class RateWizardWindow : Window
 
     private void OnSave(object sender, RoutedEventArgs e)
     {
+        // 붙여 넣고 곧바로 저장을 누르는 것이 자연스럽다.
+        // 아직 읽지 않은 내용이 남아 있으면 여기서 읽는다.
+        if (_parsed is null && !string.IsNullOrWhiteSpace(ResponseBox.Text) && !Parse())
+            return;
+
         // 요금을 새로 읽지 않았다면 예산만 바꾸러 온 것이다.
         var tariff = _parsed ?? _metering.Profile.Tariff;
 
         if (_parsed is null && !_metering.Profile.IsTariffConfigured)
         {
-            ShowResult("먼저 AI 답변을 붙여 넣고 적용해 주세요. 요금 없이는 비용을 계산할 수 없습니다.", isError: true);
+            ShowResult(Loc.T("wizard.needsRate"), isError: true);
             return;
         }
 
         if (!TryParseBudget(out double budget))
         {
-            ShowResult("예산이 숫자가 아닙니다.", isError: true);
+            ShowResult(Loc.T("wizard.budgetNotNumber"), isError: true);
             return;
         }
 

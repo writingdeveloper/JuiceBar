@@ -10,6 +10,7 @@ using JuiceBar.Core.Update;
 using Application = System.Windows.Application;
 using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
 using MessageBox = System.Windows.MessageBox;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar.Ui;
 
@@ -37,6 +38,10 @@ public sealed class TrayApp : IDisposable
     public TrayApp()
     {
         _metering = new MeteringService(_profileStore);
+
+        // 트레이 메뉴를 만들기 전에 언어를 정해야 메뉴 글자가 그 언어로 나온다.
+        Loc.Use(_metering.Profile.Language);
+
         _lastTaskbarTheme = SystemTheme.Taskbar;
 
         _notifyIcon = new NotifyIcon
@@ -143,8 +148,8 @@ public sealed class TrayApp : IDisposable
         {
             _popup?.ShowUpdate(release);
 
-            _notifyIcon.BalloonTipTitle = $"JuiceBar {release.Tag}";
-            _notifyIcon.BalloonTipText = "새 버전이 있습니다. 트레이 아이콘을 눌러 업데이트하세요.";
+            _notifyIcon.BalloonTipTitle = Loc.T("tray.update.title", release.Tag);
+            _notifyIcon.BalloonTipText = Loc.T("tray.update.text");
             _notifyIcon.ShowBalloonTip(8000);
         });
     }
@@ -153,13 +158,13 @@ public sealed class TrayApp : IDisposable
     {
         var menu = new ContextMenuStrip();
 
-        menu.Items.Add("열기", null, (_, _) => ShowPopup());
+        menu.Items.Add(Loc.T("tray.open"), null, (_, _) => ShowPopup());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("전기요금 설정...", null, (_, _) => ShowRateWizard());
-        menu.Items.Add("측정 보정...", null, (_, _) => ShowCalibration());
-        menu.Items.Add("고급 설정...", null, (_, _) => ShowSettings());
+        menu.Items.Add(Loc.T("tray.rate"), null, (_, _) => ShowRateWizard());
+        menu.Items.Add(Loc.T("tray.calibrate"), null, (_, _) => ShowCalibration());
+        menu.Items.Add(Loc.T("tray.settings"), null, (_, _) => ShowSettings());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("종료", null, (_, _) => Shutdown());
+        menu.Items.Add(Loc.T("tray.exit"), null, (_, _) => Shutdown());
 
         return menu;
     }
@@ -216,7 +221,7 @@ public sealed class TrayApp : IDisposable
         // 트레이 툴팁은 63자를 넘으면 잘린다. 짧게 유지한다.
         if (!snapshot.IsTariffConfigured)
         {
-            _notifyIcon.Text = $"{watts} · 요금 미설정";
+            _notifyIcon.Text = Loc.T("tray.tooltipNoRate", watts);
             return;
         }
 
@@ -224,7 +229,7 @@ public sealed class TrayApp : IDisposable
         string cost = CurrencyFormatter.Format(
             snapshot.CycleCost.Total, tariff.Currency, tariff.Symbol);
 
-        _notifyIcon.Text = $"{watts} · 이번 달 {cost}";
+        _notifyIcon.Text = Loc.T("tray.tooltip", watts, cost);
     }
 
     private void OnSystemThemeChanged(object? sender, EventArgs e)
@@ -304,13 +309,8 @@ public sealed class TrayApp : IDisposable
     private void PromptForPawnIo()
     {
         var result = System.Windows.MessageBox.Show(
-            "CPU 전력 센서를 읽으려면 PawnIO 드라이버가 필요합니다.\n\n"
-            + "PawnIO 는 정식 서명된 오픈소스 커널 드라이버로, LibreHardwareMonitor 등\n"
-            + "하드웨어 모니터링 도구들이 공통으로 사용합니다.\n\n"
-            + "설치하지 않아도 JuiceBar 는 동작하지만, GPU만 실측되고\n"
-            + "CPU 전력은 사용률 기반 추정값으로 대체됩니다.\n\n"
-            + "다운로드 페이지를 여시겠습니까?",
-            "JuiceBar — 정밀 측정 설정",
+            Loc.T("tray.pawnio.body"),
+            Loc.T("tray.pawnio.title"),
             MessageBoxButton.YesNo,
             MessageBoxImage.Information);
 

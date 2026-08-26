@@ -10,6 +10,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      번역은 위성 어셈블리가 아니라 어셈블리에 박아 넣은 JSON 으로 다룬다.
+      단일 파일 배포에서 동작이 예측 가능하고, 언어를 보태려면 파일 하나만 얹으면 된다.
+    -->
+    <EmbeddedResource Include="Localization\strings\*.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
     <!-- 전이 의존성인 SQLitePCLRaw 2.1.11 은 CVE-2025-6965(SQLite &lt; 3.50.2) 에 해당한다. 패치된 계열로 올려 고정한다. -->

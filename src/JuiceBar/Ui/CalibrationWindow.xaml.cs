@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using JuiceBar.Core;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar.Ui;
 
@@ -51,13 +52,13 @@ public partial class CalibrationWindow : Window
         if (!double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out double watts)
             && !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out watts))
         {
-            ShowResult("숫자를 입력해 주세요. 예: 385", isError: true);
+            ShowResult(Loc.T("calib.notNumber"), isError: true);
             return;
         }
 
         if (watts is <= 0 or > 5000)
         {
-            ShowResult("0에서 5000W 사이의 값이어야 합니다.", isError: true);
+            ShowResult(Loc.T("calib.outOfRange"), isError: true);
             return;
         }
 
@@ -71,7 +72,7 @@ public partial class CalibrationWindow : Window
         if (result.Success)
             RefreshResult();
         else
-            ShowResult(result.Error ?? "보정에 실패했습니다.", isError: true);
+            ShowResult(result.Error ?? Loc.T("calib.error.needTwo"), isError: true);
     }
 
     private void RefreshPoints()
@@ -80,13 +81,13 @@ public partial class CalibrationWindow : Window
 
         foreach (var point in _metering.Profile.CalibrationPoints)
         {
-            _points.Add(
-                $"센서 {CurrencyFormatter.FormatWatts(point.MeasuredWatts)} W "
-                + $"→ 실측 {CurrencyFormatter.FormatWatts(point.ActualWallWatts)} W");
+            _points.Add(Loc.T("calib.point",
+                CurrencyFormatter.FormatWatts(point.MeasuredWatts),
+                CurrencyFormatter.FormatWatts(point.ActualWallWatts)));
         }
 
         if (_points.Count == 1)
-            _points.Add("(지점이 하나 더 필요합니다 — 부하를 준 상태에서 측정해 주세요)");
+            _points.Add(Loc.T("calib.needSecond"));
     }
 
     private void RefreshResult()
@@ -100,9 +101,9 @@ public partial class CalibrationWindow : Window
         }
 
         ShowResult(
-            $"보정 완료 — 측정 불가 부품 {calibration.BaselineWatts:N1} W, "
-            + $"파워서플라이 효율 {calibration.Efficiency:P1}. "
-            + "이제부터 이 값으로 콘센트 전력을 계산합니다.",
+            Loc.T("calib.done",
+                calibration.BaselineWatts.ToString("N1"),
+                calibration.Efficiency.ToString("P1")),
             isError: false);
     }
 

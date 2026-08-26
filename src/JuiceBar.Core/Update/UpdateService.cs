@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar.Core.Update;
 
@@ -156,7 +157,7 @@ public sealed class UpdateService
         CancellationToken cancellationToken = default)
     {
         if (!IsTrustedDownload(release.DownloadUrl))
-            throw new InvalidOperationException("신뢰할 수 없는 다운로드 주소입니다.");
+            throw new InvalidOperationException(Loc.T("update.error.untrustedUrl"));
 
         string target = Path.Combine(
             Path.GetTempPath(), $"JuiceBar-{release.Tag}-{Guid.NewGuid():N}.exe");

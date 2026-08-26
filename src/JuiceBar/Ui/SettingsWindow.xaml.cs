@@ -7,6 +7,7 @@ using JuiceBar.Core.Power;
 using JuiceBar.Core.Storage;
 using JuiceBar.Core.Update;
 using JuiceBar.Services;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar.Ui;
 
@@ -43,7 +44,7 @@ public partial class SettingsWindow : Window
 
         TariffSummaryText.Text = profile.IsTariffConfigured
             ? TariffSummary.Describe(tariff)
-            : "아직 설정하지 않았습니다. 요금을 설정해야 비용이 계산됩니다.";
+            : Loc.T("settings.tariffNotSet");
 
         BudgetBox.Text = tariff.MonthlyBudget > 0 ? Number(tariff.MonthlyBudget) : string.Empty;
         BudgetUnit.Text = tariff.Symbol;
@@ -54,28 +55,79 @@ public partial class SettingsWindow : Window
         AutoStartCheck.IsChecked = AutoStart.IsEnabled();
         AutoUpdateCheck.IsChecked = profile.CheckForUpdates;
 
-        VersionText.Text = UpdateService.CanReplaceItself
-            ? $"현재 버전 {UpdateService.CurrentVersion} · GitHub 릴리스에서 하루 한 번 확인합니다."
-            : $"현재 버전 {UpdateService.CurrentVersion} · 개발 빌드에서는 자동 교체를 하지 않습니다.";
+        VersionText.Text = Loc.T(
+            UpdateService.CanReplaceItself ? "settings.version" : "settings.versionDev",
+            UpdateService.CurrentVersion);
 
         CpuIdleBox.Text = Number(profile.Estimation.CpuIdleWatts);
         CpuMaxBox.Text = Number(profile.Estimation.CpuMaxWatts);
         PawnIoStatus.Text = DescribeSensorAccess();
 
-        ProfilePathText.Text = $"설정 위치: {ProfileDirectory()}";
+        ProfilePathText.Text = Loc.T("settings.profilePath", ProfileDirectory());
 
+        LoadLanguages(profile.Language);
         LoadChannels();
+    }
+
+    // ─────────────────────────── 언어 ───────────────────────────
+
+    /// <summary>목록에 넣을 언어 하나. 이름은 그 언어 표기 그대로 보여 준다.</summary>
+    private sealed record LanguageChoice(string Code, string Label);
+
+    private bool _languageLoaded;
+
+    private void LoadLanguages(string current)
+    {
+        var choices = new List<LanguageChoice>
+        {
+            new(Loc.AutoCode, Loc.T("settings.languageAuto")),
+        };
+
+        foreach (var language in Loc.Available)
+            choices.Add(new LanguageChoice(language.Code, language.NativeName));
+
+        LanguageBox.ItemsSource = choices;
+        LanguageBox.SelectedItem = choices.FirstOrDefault(c => c.Code == current) ?? choices[0];
+
+        _languageLoaded = true;
+    }
+
+    /// <summary>
+    /// 고르는 즉시 화면 전체를 그 언어로 바꾼다.
+    /// 저장을 눌러야 바뀌면 어떤 언어인지 확인하고 되돌릴 방법이 없다.
+    /// </summary>
+    private void OnLanguageChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (!_languageLoaded) return;
+        if (LanguageBox.SelectedItem is not LanguageChoice choice) return;
+
+        Loc.Use(choice.Code);
+
+        // 번역이 아니라 코드에서 만든 글도 있어 다시 그린다.
+        TariffSummaryText.Text = _metering.Profile.IsTariffConfigured
+            ? TariffSummary.Describe(_metering.Profile.Tariff)
+            : Loc.T("settings.tariffNotSet");
+
+        VersionText.Text = Loc.T(
+            UpdateService.CanReplaceItself ? "settings.version" : "settings.versionDev",
+            UpdateService.CurrentVersion);
+
+        PawnIoStatus.Text = DescribeSensorAccess();
+        ProfilePathText.Text = Loc.T("settings.profilePath", ProfileDirectory());
+
+        // "Windows 설정 따르기" 항목의 이름도 새 언어로 바뀌어야 한다.
+        LoadLanguages(choice.Code);
     }
 
     /// <summary>CPU 전력을 실측하고 있는지, 못 한다면 왜 못 하는지.</summary>
     private static string DescribeSensorAccess()
     {
         if (!PawnIoDetector.IsInstalled())
-            return "PawnIO 드라이버가 없어 CPU 전력을 추정하고 있습니다. 설치하면 실측으로 바뀝니다.";
+            return Loc.T("settings.sensor.noPawnIo");
 
-        return Elevation.IsElevated
-            ? "PawnIO 설치됨 · 관리자 권한으로 실행 중 — CPU 전력을 실측합니다. 아래 값은 쓰이지 않습니다."
-            : "PawnIO 는 설치돼 있지만 관리자 권한이 없어 CPU 전력을 추정하고 있습니다.";
+        return Loc.T(Elevation.IsElevated
+            ? "settings.sensor.elevated"
+            : "settings.sensor.notElevated");
     }
 
     private void LoadChannels()
@@ -126,19 +178,19 @@ public partial class SettingsWindow : Window
     {
         if (!TryParse(BudgetBox.Text, out double budget))
         {
-            ValidationText.Text = "예산이 숫자가 아닙니다.";
+            ValidationText.Text = Loc.T("settings.error.budget");
             return;
         }
 
         if (!TryParse(CpuIdleBox.Text, out double cpuIdle) || !TryParse(CpuMaxBox.Text, out double cpuMax))
         {
-            ValidationText.Text = "CPU 추정 값이 숫자가 아닙니다.";
+            ValidationText.Text = Loc.T("settings.error.cpu");
             return;
         }
 
         if (cpuMax <= cpuIdle)
         {
-            ValidationText.Text = "CPU 최대 W는 유휴 W보다 커야 합니다.";
+            ValidationText.Text = Loc.T("settings.error.cpuOrder");
             return;
         }
 
@@ -147,7 +199,7 @@ public partial class SettingsWindow : Window
         // 채널을 전부 끄면 측정값이 0이 되어 앱이 아무것도 못 한다.
         if (_channels.Count > 0 && selectedChannels.Count == 0)
         {
-            ValidationText.Text = "전력 채널을 최소 하나는 선택해야 합니다.";
+            ValidationText.Text = Loc.T("settings.error.noChannel");
             return;
         }
 
@@ -162,6 +214,7 @@ public partial class SettingsWindow : Window
             },
             StartWithWindows = AutoStartCheck.IsChecked == true,
             CheckForUpdates = AutoUpdateCheck.IsChecked == true,
+            Language = (LanguageBox.SelectedItem as LanguageChoice)?.Code ?? Loc.AutoCode,
         };
 
         if (selectedChannels.Count > 0)
@@ -171,7 +224,7 @@ public partial class SettingsWindow : Window
 
         if (!ApplyAutoStart())
         {
-            ValidationText.Text = "자동 시작 설정에 실패했습니다. 나머지 설정은 저장되었습니다.";
+            ValidationText.Text = Loc.T("settings.error.autoStart");
             return;
         }
 
@@ -213,5 +266,10 @@ public partial class SettingsWindow : Window
         WizardRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnCancel(object sender, RoutedEventArgs e) => Close();
+    private void OnCancel(object sender, RoutedEventArgs e)
+    {
+        // 언어는 고르는 즉시 반영되므로, 저장하지 않고 닫으면 원래대로 되돌려야 한다.
+        Loc.Use(_metering.Profile.Language);
+        Close();
+    }
 }

@@ -1,4 +1,6 @@
+using System.Text;
 using System.Text.Json;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar.Core.Tariff;
 
@@ -19,70 +21,95 @@ public sealed record TariffParseResult(bool Success, TariffConfig? Tariff, strin
 public static class RatePrompt
 {
     /// <summary>
-    /// AI 에게 던질 프롬프트. 스키마를 예시와 함께 못 박아 두어야
-    /// 그대로 붙여 넣을 수 있는 형태로 답이 온다.
+    /// 스키마와 보기는 번역하지 않는다. 기계가 읽을 부분이라 어느 언어로 물어보든
+    /// 똑같은 모양으로 돌아와야 하고, 번역하면 오히려 답이 흔들린다.
     /// </summary>
-    /// <param name="region">사는 곳. 비우면 AI 가 알아서 묻거나 일반적인 값을 쓴다.</param>
+    private const string Schema = """
+        {
+          "Currency": "USD",
+          "Symbol": "$",
+          "BillingCycleStartDay": 1,
+          "FixedChargePerMonth": 0,
+          "Taxes": [{ "Name": "Sales tax", "Rate": 0.1 }],
+          "Rate": { "kind": "flat", "PricePerKwh": 0.17 },
+          "MonthlyBudget": 0
+        }
+        """;
+
+    private const string FlatExample =
+        """{ "kind": "flat", "PricePerKwh": 0.17 }""";
+
+    private const string TieredExample = """
+        { "kind": "tiered", "Tiers": [
+            { "UpToKwh": 350,  "PricePerKwh": 0.22 },
+            { "UpToKwh": 1050, "PricePerKwh": 0.28 },
+            { "UpToKwh": null, "PricePerKwh": 0.35 } ] }
+        """;
+
+    private const string TouExample = """
+        { "kind": "tou",
+          "Periods": [
+            { "Name": "peak", "Days": "mon-fri", "From": "16:00", "To": "21:00",
+              "PricePerKwh": 0.42 } ],
+          "DefaultPeriodName": "offpeak",
+          "DefaultPricePerKwh": 0.14 }
+        """;
+
+    /// <summary>
+    /// AI 에게 던질 프롬프트. 설명은 사용자의 언어로, 스키마는 그대로 둔다.
+    /// </summary>
+    /// <param name="region">사는 곳. 비우면 일반적인 표현으로 대체한다.</param>
     /// <param name="currency">
     /// 원하는 통화. 비워도 되지만, 지역명만으로는 AI 가 다른 통화를 고르는 일이 있다 —
     /// 해외 거주자가 현지 통화 대신 본국 통화를 원하는 경우도 있어서 직접 지정할 수 있게 열어 둔다.
     /// </param>
     public static string Build(string region, string currency = "")
     {
-        string place = string.IsNullOrWhiteSpace(region) ? "내가 사는 지역" : region.Trim();
+        string place = string.IsNullOrWhiteSpace(region)
+            ? Loc.T("prompt.defaultRegion")
+            : region.Trim();
 
         string currencyLine = string.IsNullOrWhiteSpace(currency)
-            ? "그 지역에서 실제로 쓰는 통화로 표기해줘."
-            : $"금액은 {currency.Trim()} 단위로 표기해줘.";
+            ? Loc.T("prompt.currencyAuto")
+            : Loc.T("prompt.currencyPinned", currency.Trim());
 
-        return $$"""
-            {{place}}의 가정용 전기요금을 알려줘. {{currencyLine}}
+        var text = new StringBuilder();
 
-            설명은 빼고 아래 형식의 JSON 만 출력해줘.
+        text.AppendLine(Loc.T("prompt.intro", place, currencyLine));
+        text.AppendLine();
+        text.AppendLine(Loc.T("prompt.onlyJson"));
+        text.AppendLine();
+        text.AppendLine(Schema);
+        text.AppendLine();
+        text.AppendLine(Loc.T("prompt.rulesHeading"));
+        text.AppendLine();
+        text.AppendLine(Loc.T("prompt.rule.currency"));
+        text.AppendLine(Loc.T("prompt.rule.billingDay"));
+        text.AppendLine(Loc.T("prompt.rule.fixedCharge"));
+        text.AppendLine(Loc.T("prompt.rule.taxes"));
+        text.AppendLine(Loc.T("prompt.rule.rate"));
+        text.AppendLine();
+        text.AppendLine($"   {Loc.T("prompt.rate.flat")}");
+        text.AppendLine(Indent(FlatExample));
+        text.AppendLine();
+        text.AppendLine($"   {Loc.T("prompt.rate.tiered")}");
+        text.AppendLine(Indent(TieredExample));
+        text.AppendLine($"   {Loc.T("prompt.rate.tieredNote")}");
+        text.AppendLine();
+        text.AppendLine($"   {Loc.T("prompt.rate.tou")}");
+        text.AppendLine(Indent(TouExample));
+        text.AppendLine($"   {Loc.T("prompt.rate.touNote")}");
+        text.AppendLine();
+        text.AppendLine(Loc.T("prompt.rule.budget"));
+        text.AppendLine(Loc.T("prompt.rule.uncertain"));
 
-            {
-              "Currency": "KRW",
-              "Symbol": "원",
-              "BillingCycleStartDay": 1,
-              "FixedChargePerMonth": 0,
-              "Taxes": [{ "Name": "부가가치세", "Rate": 0.1 }],
-              "Rate": { "kind": "flat", "PricePerKwh": 250 },
-              "MonthlyBudget": 0
-            }
-
-            규칙:
-
-            1. Currency 는 ISO 4217 코드, Symbol 은 그 지역에서 실제로 쓰는 통화 기호.
-            2. BillingCycleStartDay 는 요금이 새로 시작되는 날(보통 1).
-            3. FixedChargePerMonth 는 사용량과 무관하게 매달 붙는 기본요금. 없으면 0.
-            4. Taxes 의 Rate 는 비율로. 10% 는 0.1. 세금이 없거나 단가에 이미 포함돼
-               있으면 빈 배열로 두고, 그 사실을 JSON 밖에 한 줄로 덧붙여줘.
-            5. Rate 는 그 지역 요금제에 맞는 형태 하나를 골라서:
-
-               단일 단가:
-               { "kind": "flat", "PricePerKwh": 250 }
-
-               구간 누진 (쓸수록 단가가 오르는 방식):
-               { "kind": "tiered", "Tiers": [
-                   { "UpToKwh": 200,  "PricePerKwh": 120 },
-                   { "UpToKwh": 400,  "PricePerKwh": 214 },
-                   { "UpToKwh": null, "PricePerKwh": 307 } ] }
-               마지막 구간의 UpToKwh 는 반드시 null.
-
-               시간대별 (시간에 따라 단가가 다른 방식):
-               { "kind": "tou",
-                 "Periods": [
-                   { "Name": "peak", "Days": "mon-fri", "From": "16:00", "To": "21:00",
-                     "PricePerKwh": 0.42 } ],
-                 "DefaultPeriodName": "offpeak",
-                 "DefaultPricePerKwh": 0.14 }
-               Days 는 all / mon-fri / sat,sun 형태, 시각은 24시간제 HH:MM.
-
-            6. MonthlyBudget 은 0 으로 둬. 내가 직접 정할 거야.
-            7. 값이 확실하지 않으면 가장 일반적인 가정용 요금제를 기준으로 하고,
-               언제 기준 요금인지 JSON 밖에 한 줄로 적어줘.
-            """;
+        return text.ToString().TrimEnd();
     }
+
+    private static string Indent(string block)
+        => string.Join(
+            Environment.NewLine,
+            block.Split('\n').Select(line => "   " + line.TrimEnd('\r')));
 
     /// <summary>
     /// AI 답변에서 요금 설정을 뽑아낸다.
@@ -93,13 +120,13 @@ public static class RatePrompt
     public static TariffParseResult TryParse(string? response)
     {
         if (string.IsNullOrWhiteSpace(response))
-            return TariffParseResult.Failed("붙여 넣은 내용이 비어 있습니다.");
+            return TariffParseResult.Failed(Loc.T("rate.error.empty"));
 
         int start = response.IndexOf('{');
         int end = response.LastIndexOf('}');
 
         if (start < 0 || end <= start)
-            return TariffParseResult.Failed("JSON 을 찾지 못했습니다. AI 답변 전체를 그대로 붙여 넣어 보세요.");
+            return TariffParseResult.Failed(Loc.T("rate.error.noJson"));
 
         string json = response[start..(end + 1)];
 
@@ -116,11 +143,11 @@ public static class RatePrompt
         }
         catch (JsonException ex)
         {
-            return TariffParseResult.Failed($"JSON 형식이 올바르지 않습니다: {ex.Message}");
+            return TariffParseResult.Failed(Loc.T("rate.error.badJson", ex.Message));
         }
 
         if (tariff is null)
-            return TariffParseResult.Failed("JSON 을 읽었지만 내용이 비어 있습니다.");
+            return TariffParseResult.Failed(Loc.T("rate.error.emptyJson"));
 
         return Validate(tariff);
     }
@@ -131,31 +158,31 @@ public static class RatePrompt
     private static TariffParseResult Validate(TariffConfig tariff)
     {
         if (string.IsNullOrWhiteSpace(tariff.Currency))
-            return TariffParseResult.Failed("Currency 가 비어 있습니다.");
+            return TariffParseResult.Failed(Loc.T("rate.error.currency"));
 
         if (tariff.BillingCycleStartDay is < 1 or > 31)
-            return TariffParseResult.Failed($"BillingCycleStartDay 가 {tariff.BillingCycleStartDay} 입니다. 1~31 이어야 합니다.");
+            return TariffParseResult.Failed(Loc.T("rate.error.billingDay", tariff.BillingCycleStartDay));
 
         if (tariff.FixedChargePerMonth < 0)
-            return TariffParseResult.Failed("FixedChargePerMonth 가 음수입니다.");
+            return TariffParseResult.Failed(Loc.T("rate.error.fixedCharge"));
 
         foreach (var tax in tariff.Taxes)
         {
             // 0.1 로 써야 할 10% 를 10 으로 쓰는 실수가 잦다. 그대로 두면 요금이 열 배가 된다.
             if (tax.Rate is < 0 or > 1)
                 return TariffParseResult.Failed(
-                    $"세금 '{tax.Name}' 의 Rate 가 {tax.Rate} 입니다. 비율이어야 합니다 (10% = 0.1).");
+                    Loc.T("rate.error.taxRate", tax.Name, tax.Rate));
         }
 
         return tariff.Rate switch
         {
             FlatRate flat when flat.PricePerKwh <= 0
-                => TariffParseResult.Failed("PricePerKwh 가 0 이하입니다."),
+                => TariffParseResult.Failed(Loc.T("rate.error.price")),
 
             TieredRate tiered => ValidateTiers(tariff, tiered),
 
             TouRate tou when tou.DefaultPricePerKwh <= 0 && tou.Periods.Count == 0
-                => TariffParseResult.Failed("시간대별 요금에 구간도 기본 단가도 없습니다."),
+                => TariffParseResult.Failed(Loc.T("rate.error.tou")),
 
             _ => TariffParseResult.Succeeded(tariff),
         };
@@ -164,7 +191,7 @@ public static class RatePrompt
     private static TariffParseResult ValidateTiers(TariffConfig tariff, TieredRate tiered)
     {
         if (tiered.Tiers.Count == 0)
-            return TariffParseResult.Failed("누진 구간이 비어 있습니다.");
+            return TariffParseResult.Failed(Loc.T("rate.error.tiersEmpty"));
 
         double previous = 0;
 
@@ -173,7 +200,7 @@ public static class RatePrompt
             var tier = tiered.Tiers[i];
 
             if (tier.PricePerKwh <= 0)
-                return TariffParseResult.Failed($"{i + 1}번째 구간의 단가가 0 이하입니다.");
+                return TariffParseResult.Failed(Loc.T("rate.error.tierPrice", i + 1));
 
             bool isLast = i == tiered.Tiers.Count - 1;
 
@@ -181,17 +208,17 @@ public static class RatePrompt
             {
                 // 마지막 구간에 상한이 있으면 그 위 사용량의 요금이 정의되지 않는다.
                 if (tier.UpToKwh is not null)
-                    return TariffParseResult.Failed("마지막 구간의 UpToKwh 는 null 이어야 합니다.");
+                    return TariffParseResult.Failed(Loc.T("rate.error.lastTierBounded"));
 
                 continue;
             }
 
             if (tier.UpToKwh is not double limit)
-                return TariffParseResult.Failed($"{i + 1}번째 구간에 UpToKwh 가 없습니다.");
+                return TariffParseResult.Failed(Loc.T("rate.error.tierMissing", i + 1));
 
             if (limit <= previous)
                 return TariffParseResult.Failed(
-                    $"구간 상한이 커지는 순서가 아닙니다 ({limit} ≤ {previous}).");
+                    Loc.T("rate.error.tierOrder", limit, previous));
 
             previous = limit;
         }

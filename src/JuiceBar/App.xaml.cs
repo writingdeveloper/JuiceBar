@@ -1,5 +1,6 @@
 using System.Windows;
 using JuiceBar.Ui;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar;
 
@@ -20,7 +21,7 @@ public partial class App : Application
         if (!isFirst)
         {
             MessageBox.Show(
-                "JuiceBar 가 이미 실행 중입니다. 작업표시줄 오른쪽 트레이를 확인해 주세요.",
+                Loc.T("tray.alreadyRunning"),
                 "JuiceBar",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

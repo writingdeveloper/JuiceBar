@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using JuiceBar.Core.Energy;
+using JuiceBar.Core.Localization;
 using JuiceBar.Core.Power;
 using JuiceBar.Core.Storage;
 using JuiceBar.Core.Tariff;
@@ -104,7 +105,7 @@ public sealed class MeteringService : IDisposable
         lock (_gate)
         {
             if (Latest is null)
-                return CalibrationResult.Failed("아직 센서 값을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.");
+                return CalibrationResult.Failed(Loc.T("calib.notReady"));
 
             var points = new List<CalibrationPoint>(Profile.CalibrationPoints)
             {

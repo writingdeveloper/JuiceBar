@@ -1,7 +1,9 @@
+using JuiceBar.Core.Localization;
 using JuiceBar.Core.Power;
 
 namespace JuiceBar.Tests;
 
+[Collection(LocalizationCollection.Name)]
 public class CalibrationModelTests
 {
     /// <summary>알려진 B, η 로 합성한 표본에서 원래 값이 복원되어야 한다.</summary>
@@ -40,18 +42,23 @@ public class CalibrationModelTests
     private static CalibrationPoint SynthesisePoint(CalibrationModel truth, double measuredWatts)
         => new(measuredWatts, truth.ToWallWatts(measuredWatts));
 
+    /// <summary>테스트가 도는 기계의 시스템 언어에 좌우되지 않게 못 박는다.</summary>
+    private static void UseEnglish() => Loc.Use("en");
+
     [Fact]
     public void Fit_needs_at_least_two_samples()
     {
+        UseEnglish();
         var result = CalibrationModel.Fit([new CalibrationPoint(60, 108)]);
 
         Assert.False(result.Success);
-        Assert.Contains("2개", result.Error);
+        Assert.Contains("two readings", result.Error);
     }
 
     [Fact]
     public void Fit_rejects_samples_taken_at_effectively_the_same_load()
     {
+        UseEnglish();
         // 두 점의 콘센트 전력이 같으면 직선의 기울기를 정할 수 없다.
         var result = CalibrationModel.Fit(
         [
@@ -60,12 +67,13 @@ public class CalibrationModelTests
         ]);
 
         Assert.False(result.Success);
-        Assert.Contains("차이가 너무 작습니다", result.Error);
+        Assert.Contains("too close together", result.Error);
     }
 
     [Fact]
     public void Fit_rejects_a_physically_impossible_efficiency()
     {
+        UseEnglish();
         // 센서 합산이 콘센트 전력보다 크게 나오면 효율이 1을 넘어 버린다.
         var result = CalibrationModel.Fit(
         [
@@ -74,12 +82,13 @@ public class CalibrationModelTests
         ]);
 
         Assert.False(result.Success);
-        Assert.Contains("효율", result.Error);
+        Assert.Contains("efficiency", result.Error);
     }
 
     [Fact]
     public void Fit_rejects_an_implausible_baseline()
     {
+        UseEnglish();
         // 효율은 0.9 로 정상 범위지만 베이스라인이 400W 로 나온다 —
         // 콘센트 전력에 비해 센서가 잡아내는 몫이 지나치게 작은 경우다.
         var result = CalibrationModel.Fit(
@@ -89,7 +98,7 @@ public class CalibrationModelTests
         ]);
 
         Assert.False(result.Success);
-        Assert.Contains("베이스라인", result.Error);
+        Assert.Contains("baseline", result.Error);
     }
 
     [Fact]

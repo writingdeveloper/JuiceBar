@@ -1,3 +1,5 @@
+using JuiceBar.Core.Localization;
+
 namespace JuiceBar.Core.Power;
 
 /// <summary>캘리브레이션 표본 하나 — 센서 합산값과 그때 실제로 측정된 콘센트 전력.</summary>
@@ -44,7 +46,7 @@ public sealed record CalibrationModel
     public static CalibrationResult Fit(IReadOnlyList<CalibrationPoint> points)
     {
         if (points.Count < 2)
-            return CalibrationResult.Failed("표본이 2개 이상 필요합니다.");
+            return CalibrationResult.Failed(Loc.T("calib.error.needTwo"));
 
         double n = points.Count;
         double sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
@@ -62,7 +64,7 @@ public sealed record CalibrationModel
         // 두 표본의 콘센트 전력이 거의 같으면 직선을 정할 수 없다.
         // 유휴와 부하처럼 충분히 떨어진 지점에서 재야 한다.
         if (Math.Abs(denominator) < 1e-6)
-            return CalibrationResult.Failed("표본들의 전력 차이가 너무 작습니다. 유휴 상태와 고부하 상태에서 각각 측정해 주세요.");
+            return CalibrationResult.Failed(Loc.T("calib.error.tooClose"));
 
         double slope = ((n * sumXY) - (sumX * sumY)) / denominator;
         double intercept = (sumY - (slope * sumX)) / n;
@@ -73,11 +75,11 @@ public sealed record CalibrationModel
         // 물리적으로 말이 되는 범위를 벗어나면 잘못 잰 것이다.
         if (efficiency is <= 0.5 or > 1.0)
             return CalibrationResult.Failed(
-                $"계산된 파워서플라이 효율이 {efficiency:P0}로 비정상입니다. 측정값을 다시 확인해 주세요.");
+                Loc.T("calib.error.efficiency", efficiency.ToString("P0")));
 
         if (baseline is < 0 or > 300)
             return CalibrationResult.Failed(
-                $"계산된 베이스라인이 {baseline:F0}W로 비정상입니다. 측정값을 다시 확인해 주세요.");
+                Loc.T("calib.error.baseline", baseline.ToString("F0")));
 
         return CalibrationResult.Succeeded(new CalibrationModel
         {

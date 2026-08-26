@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JuiceBar.Core.Localization;
 using JuiceBar.Core.Platform;
 using JuiceBar.Core.Power;
 using JuiceBar.Core.Tariff;
@@ -48,6 +49,12 @@ public sealed record DeviceProfile
 
     /// <summary>GitHub 릴리스에서 새 버전을 자동으로 확인할지.</summary>
     public bool CheckForUpdates { get; init; } = true;
+
+    /// <summary>
+    /// 화면에 쓸 언어. "auto" 면 Windows 표시 언어를 따라간다.
+    /// 장비마다 따로 두는 이유는, 회사 노트북은 영어이고 집 PC는 모국어인 경우가 있어서다.
+    /// </summary>
+    public string Language { get; init; } = Loc.AutoCode;
 
     /// <summary>이 장비가 노트북인지. 배터리 자동 캘리브레이션 가능 여부를 뜻한다.</summary>
     public bool HasBattery { get; init; }

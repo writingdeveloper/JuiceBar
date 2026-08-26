@@ -1,182 +1,200 @@
 # JuiceBar
 
-A fuel gauge for your PC's electricity bill, in the Windows tray.
+**A fuel gauge for your PC's electricity bill, in the Windows tray.**
 
-JuiceBar measures how much power your computer is actually drawing, converts it
-into money using your local electricity rate, and keeps a gauge in the system
-tray that fills up like a fuel gauge as the billing cycle goes on.
+[![build](https://github.com/writingdeveloper/JuiceBar/actions/workflows/build.yml/badge.svg)](https://github.com/writingdeveloper/JuiceBar/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/v/release/writingdeveloper/JuiceBar)](https://github.com/writingdeveloper/JuiceBar/releases/latest)
+[![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-Click it and you get the details: current watts, energy and cost for today and
-for the cycle, a projection for the end of the month, and a trend of the last
-hour.
+JuiceBar measures what your computer is actually drawing, turns it into money at
+your local rate, and keeps a gauge in the tray that fills up as the billing
+cycle goes on. Click it and the cost ticks upward in front of you.
+
+<p align="center">
+  <img src="docs/popup.png" width="352" alt="The JuiceBar popup: a fuel gauge, the running cost for this cycle, today's usage, a projection, and a trend of the last hour." />
+</p>
+
+**[Download the latest release →](https://github.com/writingdeveloper/JuiceBar/releases/latest)**
+One file, no installer, no .NET runtime required.
 
 ---
 
-## Why bother
+## Why
 
-A desktop PC with a high-end GPU can pull anywhere between 60 W idle and 600 W
-under load. That difference is real money, but nothing on Windows shows it to
-you. JuiceBar makes it visible without you having to think about it.
+A desktop with a decent GPU swings between 60 W idle and 600 W under load. That
+gap is real money, and nothing on Windows shows it to you. JuiceBar makes it
+visible without you having to go looking.
 
-## Accuracy
+## Setting your rate takes one paste
 
-This is the part that matters, so it's worth being precise about what JuiceBar
-does and does not know.
+Electricity tariffs differ everywhere and are structured differently too —
+flat here, tiered there, time-of-use somewhere else, with standing charges and
+taxes layered on top. Most people do not know their own tariff in that detail,
+and a form with twenty fields is where good intentions go to die.
+
+So JuiceBar writes the prompt for you.
+
+<p align="center">
+  <img src="docs/rate-setup.png" width="520" alt="The rate setup window: type your location and currency, copy the generated prompt, paste the assistant's reply back." />
+</p>
+
+1. Type where you live. Add a currency if you want to pin one.
+2. Press **Copy prompt** and paste it into Gemini, ChatGPT or Claude.
+3. Paste the reply straight back.
+
+The prompt pins down a fixed JSON schema, so the answer arrives in a shape
+JuiceBar can read with nothing left to edit. Currency, symbol, billing day,
+standing charge, taxes and the whole rate structure all land in that one paste.
+Explanation around the JSON is fine — only the JSON is read.
+
+What comes back is checked before it is accepted. A tax rate written as `10`
+instead of `0.1`, a final tier with an upper bound, tiers out of order, a
+billing day of 45 — each is rejected with a message saying what is wrong,
+rather than silently producing a bill ten times too large.
+
+Then JuiceBar asks for the one thing an assistant cannot know: your monthly
+budget. That is the whole setup.
+
+> Rather type it yourself? **Show current settings** drops the active tariff
+> into the same box as JSON, ready to edit. Starting points for several
+> countries live in [`tariffs/`](tariffs/).
+
+---
+
+## How accurate is it, really
+
+This is the part worth being precise about.
 
 Windows does not report your computer's power consumption. There is no API for
-it. What hardware sensors *do* report is the power of individual components:
+it. What hardware sensors report is the power of individual components:
 
 | Component | Source | Available |
 |---|---|---|
-| CPU package | Intel RAPL / AMD SMU, via PawnIO | needs the driver + admin |
+| CPU package | Intel RAPL / AMD SMU, via PawnIO | needs the driver and admin rights |
 | Discrete GPU | NVIDIA NVML / AMD ADL | always |
-| Battery charge & discharge | ACPI | laptops only |
-| Motherboard, RAM, SSDs, fans | — | never measurable |
+| Battery charge and discharge | ACPI | laptops only |
+| Motherboard, RAM, drives, fans | — | never measurable |
 | Power supply losses | — | never measurable |
 
-So JuiceBar models the rest:
+So the rest is modelled:
 
 ```
 P_wall = (P_measured + B) / η
 
-  P_measured : sum of the sensors above
+  P_measured : the sensors above, summed
   B          : constant draw of the parts nothing can measure
   η          : power supply efficiency
 ```
 
 `B` and `η` differ from machine to machine, so JuiceBar works them out for your
-hardware rather than guessing:
+hardware instead of guessing.
 
-**On a laptop** — no input needed. While running on battery, the discharge rate
-*is* the true whole-system power. JuiceBar compares it against the sensor sum
-and learns `B` on its own, then applies what it learned once you plug back in.
+**On a laptop, nothing to do.** While running on battery, the discharge rate
+*is* the true whole-system power. JuiceBar compares it against the sensor sum,
+learns `B` on its own, and applies what it learned once you plug back in.
 
-**On a desktop** — open the calibration window and enter what a plug-in power
-meter or an energy-monitoring smart plug reads, once while idle and once under
-load. Two points, two unknowns, solved exactly. This takes the error from around
-±15% down to roughly ±5%.
+**On a desktop, two numbers.** Open the calibration window and enter what a
+plug-in wattmeter or an energy-monitoring smart plug reads — once while idle,
+once under load. Two points, two unknowns, solved exactly. That takes the error
+from roughly ±15% down to about ±5%.
 
-Without calibration JuiceBar uses conservative defaults (`B` = 35 W,
-`η` = 0.88) and labels the reading "미보정" so you know not to trust it too far.
+Without calibration JuiceBar uses conservative defaults and labels the reading
+*not calibrated*, so you know how far to trust it.
 
-### The PawnIO driver
+### Things that quietly go wrong, and don't here
 
-CPU package power lives behind model-specific registers, which need a kernel
-driver. LibreHardwareMonitor — which JuiceBar uses for sensors — switched to
-[PawnIO](https://pawnio.eu/) for this, a signed open-source driver. Install it
-and run JuiceBar elevated to get real CPU numbers.
+**Integrated graphics get counted twice.** An iGPU sits inside the CPU package,
+so its power appears in `CPU Package` *and* again as `GPU Core` / `GPU SoC`. On
+a Ryzen 9 7950X that is 46 W of draw that is not there. JuiceBar excludes
+integrated GPUs by default — and because sensor naming varies by hardware and no
+heuristic will be right everywhere, the settings window shows every channel with
+a running total so you can see the double count and switch it off.
 
-If you skip it, JuiceBar still runs. GPU power is still measured properly, and
-the CPU share is estimated from utilisation instead. The badge in the popup will
-say so.
+**The CPU driver may be missing.** CPU package power lives behind
+model-specific registers, which need a kernel driver.
+[PawnIO](https://pawnio.eu/) is the signed, open-source one that
+LibreHardwareMonitor uses. Install it and run JuiceBar elevated for real CPU
+numbers. Skip it and JuiceBar still works — GPU power is measured properly and
+the CPU share is estimated from utilisation, which the badge in the popup says
+plainly rather than pretending otherwise.
 
 > The driver PawnIO replaced, WinRing0, is on Microsoft's vulnerable-driver
 > blocklist. JuiceBar never ships it.
 
-### Double counting
-
-Integrated graphics sit inside the CPU package, so their power shows up twice —
-once in `CPU Package` and again as `GPU Core` / `GPU SoC`. On a Ryzen 9 7950X
-that's an extra 46 W of phantom draw if you add them all up. JuiceBar excludes
-integrated GPUs by default, and the settings window lets you inspect and change
-every channel that goes into the sum, because sensor naming varies by hardware
-and the heuristic will not be right everywhere.
-
 ---
 
-## Electricity rates
+## Languages
 
-JuiceBar has no built-in rates for any country, and it does not ask you to fill
-in a form of twenty fields either. It gives you a prompt to paste into an AI
-assistant, and reads the answer back.
+English, 한국어, 日本語, 简体中文, Español and Deutsch. JuiceBar follows your
+Windows display language by default and can be switched in settings; numbers and
+dates follow the chosen language too.
 
-1. Type where you live and press **프롬프트 복사**.
-2. Paste it into Gemini, ChatGPT, Claude — whichever you use.
-3. Paste the reply straight back into JuiceBar and press apply.
+<p align="center">
+  <img src="docs/popup-de.png" width="300" alt="The popup in German" />
+  <img src="docs/popup-ja.png" width="300" alt="The popup in Japanese" />
+</p>
 
-The prompt pins down a fixed JSON schema, so the reply comes back in a shape
-JuiceBar can read without you editing anything. Currency, symbol, billing day,
-standing charge, taxes and the whole rate structure all arrive in that one
-paste. Explanations around the JSON are fine — only the JSON is extracted.
+The prompt sent to the assistant is translated as well, while the JSON schema
+inside it stays identical in every language — that part is read by a machine.
 
-The parsed values are validated before they are accepted: a tax rate written as
-`10` instead of `0.1`, a final tier with an upper bound, tiers out of order, a
-billing day of 45 — all of these are rejected with a message saying what is
-wrong, rather than silently producing a bill ten times too large.
-
-You are then asked for one thing the AI cannot know: your monthly budget. That's
-the whole setup. Everything else in Settings — budget, gauge basis, start with
-Windows — is the same regardless of where you live.
-
-> Prefer to type it yourself? **현재 설정 꺼내기** puts the active tariff into
-> the same box as JSON, so you can edit a number and apply it.
-
-Three shapes cover most of the world:
-
-- **Flat** — one price per kWh. The default, and enough for most people.
-- **Tiered** — the price rises as cycle usage crosses thresholds. Korea, Japan,
-  parts of the US.
-- **Time-of-use** — the price depends on the time of day. Common in Europe,
-  North America and Australia.
-
-On top of that: an optional monthly standing charge and any number of
-percentage taxes.
-
-Ready-made starting points live in [`tariffs/`](tariffs/) — paste one into the
-same box if you'd rather start from a known tariff than ask an AI. Contributions
-for more countries are welcome: one file per tariff, with a comment saying where
-the numbers came from and when.
-
-Set a monthly budget and the gauge fills against it. Leave it at zero and the
-gauge tracks instantaneous power instead. You can switch between the two at any
-time from the popup.
+Adding a language means adding one JSON file under
+[`src/JuiceBar.Core/Localization/strings/`](src/JuiceBar.Core/Localization/strings/)
+and listing it in `Loc.Available`. A test checks that every language has exactly
+the same keys and placeholders as English, so translations cannot drift out of
+sync unnoticed.
 
 ---
 
 ## Updates
 
 JuiceBar checks GitHub Releases once a day and offers the new version in the
-popup. Accepting it downloads the new executable and restarts into it — there is
-no installer to run, because there was none to begin with.
+popup. Accepting it downloads the executable and restarts into it — there is no
+installer to run, because there was none to begin with.
 
-Replacing a running executable is not allowed on Windows, but renaming one is.
-So the current file is moved aside to `JuiceBar.exe.old`, the new one takes its
-place, and the leftover is deleted on the next start. If anything fails midway
-the old file is moved back, so a failed update leaves a working app rather than
-a broken one.
+Windows will not let a running executable be overwritten, but it will let one be
+renamed. So the current file moves aside to `JuiceBar.exe.old`, the new one takes
+its place, and the leftover is deleted on the next start. If anything fails
+midway the old file moves back, so a failed update leaves a working app rather
+than a broken one.
 
-Two checks before anything is written: the download URL must be on a GitHub
-host, and the downloaded file must match the published size and actually be a
+Two checks happen before anything is written: the download URL must be on a
+GitHub host, and the file must match the published size and actually be a
 Windows executable. Otherwise the update is refused and you are pointed at the
-release page instead.
+release page.
 
-Turn it off in Settings if you would rather update by hand.
+Turn it off in settings if you would rather update by hand.
+
+---
 
 ## Footprint
 
-A power meter that itself wastes power would be a poor joke, so this is measured
-rather than assumed.
-
-JuiceBar polls sensors once a second and writes one row per minute to SQLite.
-Two things were fixed after measuring:
+A power meter that wasted power would be a poor joke, so this was measured
+rather than assumed. JuiceBar polls sensors once a second and writes one row per
+minute. Two things were fixed once the numbers came in:
 
 - **LibreHardwareMonitor keeps a rolling history of every sensor value in
-  memory.** For a tray app that stays open for days that grows without bound,
-  and JuiceBar keeps the history it actually needs in SQLite anyway. Setting
-  `ValuesTimeWindow` to zero cut private memory from 213 MB to about 126 MB.
-- **The cycle and daily totals were re-queried from SQLite every second.** Over
-  a month of minute rows that is a full scan per second for numbers that only
-  change once a minute. They are now cached per minute, with the unwritten
-  current minute added on top so the display still moves smoothly.
+  memory.** For an app that stays open for days that grows without bound, and
+  JuiceBar keeps the history it actually needs in SQLite anyway. Switching it off
+  cut private memory from 213 MB to about 130 MB.
+- **The cycle and daily totals were re-queried every second.** Over a month of
+  minute rows that is a full scan per second for numbers that change once a
+  minute. They are cached now, with the unwritten current minute added on top so
+  the display still moves smoothly.
+
+Ten minutes of sampling afterwards: memory flat at 126–131 MB, handles flat,
+GDI objects flat at 37.
+
+---
 
 ## Multiple machines
 
 Each machine runs its own copy and keeps its own everything — calibration,
-channel selection, history, tariff. There is no server, no account, nothing to
-sign into. Copy the executable to a laptop and it starts a fresh profile keyed
-to that machine.
+channel selection, history, tariff, language. No server, no account, nothing to
+sign into. Copy the executable to a laptop and it starts a fresh profile keyed to
+that machine.
 
-Data lives in `%APPDATA%\JuiceBar\devices\<machine-id>\`.
+Data lives in `%APPDATA%\JuiceBar\devices\<machine-id>\`. Delete that folder to
+start over.
 
 ---
 
@@ -195,35 +213,35 @@ dotnet publish src/JuiceBar -c Release -r win-x64 --self-contained \
   -o publish
 ```
 
-That produces a single ~75 MB `JuiceBar.exe` that needs no .NET runtime
-installed. Without compression it is 172 MB.
-
-The app requests administrator rights in its manifest, so a debugger has to be
-started elevated too.
+That produces a single ~75 MB `JuiceBar.exe` needing no .NET runtime installed.
+Without compression it is 172 MB.
 
 ### Layout
 
 ```
-src/JuiceBar.Core     sensors, calibration, energy integration, tariffs, storage
+src/JuiceBar.Core     sensors, calibration, energy integration, tariffs,
+                      storage, updates, translations
 src/JuiceBar          WPF tray application
-tests/JuiceBar.Tests  unit tests for everything that doesn't need hardware
+tests/JuiceBar.Tests  everything that doesn't need hardware — 139 tests
 tools/SensorProbe     console utility that dumps what your machine reports
 ```
 
-`tools/SensorProbe` is the first thing to run when sensors misbehave — it prints
-every power sensor LibreHardwareMonitor can see, so you can tell a missing
-driver apart from a bad channel selection.
+`tools/SensorProbe` is the first thing to run when sensors misbehave. It prints
+every power sensor LibreHardwareMonitor can see, which tells a missing driver
+apart from a bad channel selection.
 
 Setting `JUICEBAR_PIN_POPUP=1` opens the popup at startup and stops it closing
-when it loses focus, which makes it possible to screenshot and iterate on the
-UI. It changes nothing otherwise.
+when it loses focus, which makes it possible to screenshot and iterate on the UI.
 
-To start over, delete `%APPDATA%\JuiceBar` — profiles, calibration and history
-all live there.
+Releases are cut by tagging: `git tag v1.2.3 && git push --tags` builds, tests,
+publishes and attaches the executable. The version lives in
+`Directory.Build.props` and must match the tag.
 
 ---
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE) and
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+MIT. See [LICENSE](LICENSE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+Contributions welcome — especially tariff presets for more countries and
+translations.

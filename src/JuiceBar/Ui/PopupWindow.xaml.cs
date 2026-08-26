@@ -9,6 +9,7 @@ using JuiceBar.Core.Platform;
 using JuiceBar.Core.Power;
 using JuiceBar.Core.Storage;
 using JuiceBar.Core.Update;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar.Ui;
 
@@ -130,8 +131,8 @@ public partial class PopupWindow : Window
             PrimaryUnit.Text = "W";
 
             GaugeCaption.Text = snapshot.Tariff.MonthlyBudget <= 0 && snapshot.GaugeMode == GaugeMode.Budget
-                ? "예산을 설정하면 요금 기준으로 바뀝니다"
-                : $"최대 {CurrencyFormatter.FormatWatts(_metering.Profile.ObservedPeakWatts)} W 기준";
+                ? Loc.T("popup.setBudgetHint")
+                : Loc.T("popup.maxWatts", CurrencyFormatter.FormatWatts(_metering.Profile.ObservedPeakWatts));
         }
         else
         {
@@ -142,7 +143,7 @@ public partial class PopupWindow : Window
             string budget = CurrencyFormatter.Format(
                 snapshot.Tariff.MonthlyBudget, snapshot.Tariff.Currency, snapshot.Tariff.Symbol);
 
-            GaugeCaption.Text = $"예산 {budget} 중 {percent:N0}% 사용";
+            GaugeCaption.Text = Loc.T("popup.budgetUsed", percent.ToString("N0"), budget);
         }
     }
 
@@ -163,7 +164,7 @@ public partial class PopupWindow : Window
         Trend.Values = watts;
 
         PeakLabel.Text = watts.Count > 0
-            ? $"최고 {CurrencyFormatter.FormatWatts(watts.Max())} W"
+            ? Loc.T("popup.peak", CurrencyFormatter.FormatWatts(watts.Max()))
             : string.Empty;
     }
 
@@ -186,10 +187,11 @@ public partial class PopupWindow : Window
         _costConfigured = snapshot.IsTariffConfigured;
 
         CostRate.Text = _costConfigured
-            ? $"지금 시간당 {CurrencyFormatter.Format(snapshot.CostPerHour, snapshot.Tariff.Currency, snapshot.Tariff.Symbol)}"
-            : "요금을 설정하면 여기에 비용이 쌓입니다";
+            ? Loc.T("popup.ratePerHour",
+                CurrencyFormatter.Format(snapshot.CostPerHour, snapshot.Tariff.Currency, snapshot.Tariff.Symbol))
+            : Loc.T("popup.noRateYet");
 
-        RateButton.Content = _costConfigured ? "요금 설정" : "요금 설정하기";
+        RateButton.Content = Loc.T(_costConfigured ? "popup.rateButton" : "popup.rateButtonSetup");
 
         RenderTickingCost();
     }
@@ -237,9 +239,8 @@ public partial class PopupWindow : Window
 
         // 금액 뒤에 조사를 붙이면 통화 기호에 따라 "215원이" / "$0.42가" 처럼
         // 받침 여부가 달라져 틀린 문장이 된다. 조사가 필요 없는 형태로 쓴다.
-        WarningText.Text =
-            $"다음 누진 구간까지 {warning.KwhUntilNextTier:N1} kWh 남았습니다. "
-            + $"넘어가면 kWh당 단가 {current} → {next}";
+        WarningText.Text = Loc.T(
+            "popup.tierWarning", warning.KwhUntilNextTier.ToString("N1"), current, next);
 
         WarningCard.Visibility = Visibility.Visible;
     }
@@ -248,13 +249,13 @@ public partial class PopupWindow : Window
     {
         var (text, color) = power.Quality switch
         {
-            PowerQuality.Measured => ("배터리 방전율 실측", Color.FromRgb(0x2E, 0xD5, 0x73)),
-            PowerQuality.SensorCalibrated => ("센서 실측 · 보정됨", Color.FromRgb(0x2E, 0xD5, 0x73)),
-            PowerQuality.SensorUncalibrated => ("센서 실측 · 미보정", Color.FromRgb(0xF5, 0xC2, 0x2C)),
-            _ => ($"CPU 추정 · {EstimationReason()}", Color.FromRgb(0xF5, 0x8A, 0x2C)),
+            PowerQuality.Measured => (Loc.T("popup.quality.measured"), Color.FromRgb(0x2E, 0xD5, 0x73)),
+            PowerQuality.SensorCalibrated => (Loc.T("popup.quality.calibrated"), Color.FromRgb(0x2E, 0xD5, 0x73)),
+            PowerQuality.SensorUncalibrated => (Loc.T("popup.quality.uncalibrated"), Color.FromRgb(0xF5, 0xC2, 0x2C)),
+            _ => (Loc.T("popup.quality.estimated", EstimationReason()), Color.FromRgb(0xF5, 0x8A, 0x2C)),
         };
 
-        QualityText.Text = power.OnBattery ? $"{text} · 배터리 구동" : text;
+        QualityText.Text = power.OnBattery ? Loc.T("popup.quality.onBattery", text) : text;
         QualityDot.Fill = new SolidColorBrush(color);
     }
 
@@ -264,16 +265,18 @@ public partial class PopupWindow : Window
     /// </summary>
     private static string EstimationReason()
     {
-        if (!PawnIoDetector.IsInstalled()) return "PawnIO 미설치";
+        if (!PawnIoDetector.IsInstalled()) return Loc.T("popup.reason.noPawnIo");
 
-        return Elevation.IsElevated
-            ? "CPU 센서 응답 없음"
-            : "관리자 권한 없이 실행 중";
+        return Loc.T(Elevation.IsElevated
+            ? "popup.reason.noResponse"
+            : "popup.reason.noElevation");
     }
 
     /// <summary>지금 무엇을 기준으로 그리고 있는지 보여 준다. 누르면 반대쪽으로 바뀐다.</summary>
     private void UpdateModeButton()
-        => ModeButton.Content = _metering.Profile.GaugeMode == GaugeMode.Budget ? "요금 기준" : "전력 기준";
+        => ModeButton.Content = Loc.T(_metering.Profile.GaugeMode == GaugeMode.Budget
+            ? "popup.mode.budget"
+            : "popup.mode.instant");
 
     private void OnToggleMode(object sender, RoutedEventArgs e)
     {
@@ -314,10 +317,10 @@ public partial class PopupWindow : Window
     {
         _pendingUpdate = release;
 
-        UpdateTitle.Text = $"새 버전 {release.Tag}";
-        UpdateDetail.Text = $"지금 {UpdateService.CurrentVersion} · 눌러서 받고 다시 시작합니다";
+        UpdateTitle.Text = Loc.T("popup.update.title", release.Tag);
+        UpdateDetail.Text = Loc.T("popup.update.detail", UpdateService.CurrentVersion);
         UpdateButton.IsEnabled = true;
-        UpdateButton.Content = "업데이트";
+        UpdateButton.Content = Loc.T("popup.update.button");
 
         UpdateCard.Visibility = Visibility.Visible;
     }
@@ -341,10 +344,10 @@ public partial class PopupWindow : Window
         }
         catch (Exception ex)
         {
-            UpdateTitle.Text = "업데이트에 실패했습니다";
-            UpdateDetail.Text = $"{ex.Message} — 릴리스 페이지에서 직접 받을 수 있습니다.";
+            UpdateTitle.Text = Loc.T("popup.update.failed");
+            UpdateDetail.Text = Loc.T("popup.update.failedDetail", ex.Message);
 
-            UpdateButton.Content = "릴리스 열기";
+            UpdateButton.Content = Loc.T("popup.update.openRelease");
             UpdateButton.IsEnabled = true;
 
             // 다음 클릭은 내려받기를 다시 시도하는 대신 브라우저를 연다.

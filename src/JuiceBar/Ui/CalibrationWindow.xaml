@@ -1,7 +1,8 @@
 <Window x:Class="JuiceBar.Ui.CalibrationWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="JuiceBar — 캘리브레이션"
+        xmlns:ui="clr-namespace:JuiceBar.Ui"
+        Title="{ui:Translate calib.title}"
         Width="480" SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -11,20 +12,20 @@
 
     <StackPanel Margin="24,20,24,22">
 
-        <TextBlock Text="전력계 값으로 보정하기"
+        <TextBlock Text="{ui:Translate calib.heading}"
                    Style="{StaticResource BodyText}"
                    FontSize="17" FontWeight="SemiBold" />
 
         <TextBlock Style="{StaticResource CaptionText}"
                    TextWrapping="Wrap"
                    Margin="0,8,0,0"
-                   Text="메인보드·SSD·팬의 전력과 파워서플라이 손실은 센서로 잴 수 없어 추정값을 씁니다. 콘센트에 꽂는 전력계나 전력 측정 기능이 있는 스마트 플러그의 값을 알려 주시면, 이 장비에 맞는 실제 값을 역산합니다." />
+                   Text="{ui:Translate calib.intro}" />
 
         <TextBlock Style="{StaticResource CaptionText}"
                    TextWrapping="Wrap"
                    Margin="0,10,0,0"
                    Foreground="{DynamicResource TextTertiaryBrush}"
-                   Text="유휴 상태에서 한 번, 그리고 게임이나 렌더링으로 부하를 준 상태에서 한 번 — 서로 충분히 떨어진 두 지점이 필요합니다." />
+                   Text="{ui:Translate calib.hint}" />
 
         <!-- 지금 값 -->
         <Border Style="{StaticResource Card}" Margin="0,18,0,0">
@@ -38,11 +39,11 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="현재 센서 합산" Style="{StaticResource CaptionText}" />
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{ui:Translate calib.measured}" Style="{StaticResource CaptionText}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" x:Name="MeasuredValue"
                            Style="{StaticResource NumericText}" FontWeight="SemiBold" MinWidth="90" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="현재 추정 콘센트 전력"
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="{ui:Translate calib.estimated}"
                            Style="{StaticResource CaptionText}" Margin="0,6,0,0" />
                 <TextBlock Grid.Row="1" Grid.Column="1" x:Name="EstimatedValue"
                            Style="{StaticResource NumericText}"
@@ -65,7 +66,7 @@
                      KeyDown="OnInputKeyDown" />
 
             <Button Grid.Column="1"
-                    Content="이 지점 추가"
+                    Content="{ui:Translate calib.add}"
                     Style="{StaticResource AccentButton}"
                     Margin="8,0,0,0"
                     Click="OnAddPoint" />
@@ -74,7 +75,7 @@
         <TextBlock Style="{StaticResource LabelText}"
                    FontWeight="Normal"
                    Margin="2,6,0,0"
-                   Text="전력계에 표시된 값을 와트(W) 단위로 입력하세요." />
+                   Text="{ui:Translate calib.inputHint}" />
 
         <!-- 기록된 지점 -->
         <ItemsControl x:Name="PointList" Margin="0,14,0,0">
@@ -103,11 +104,11 @@
         </Border>
 
         <Grid Margin="0,20,0,0">
-            <Button Content="보정값 초기화"
+            <Button Content="{ui:Translate calib.reset}"
                     Style="{StaticResource SubtleButton}"
                     HorizontalAlignment="Left"
                     Click="OnReset" />
-            <Button Content="닫기"
+            <Button Content="{ui:Translate calib.close}"
                     Style="{StaticResource AccentButton}"
                     HorizontalAlignment="Right"
                     Click="OnClose" />

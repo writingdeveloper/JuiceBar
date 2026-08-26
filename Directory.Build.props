@@ -6,7 +6,7 @@
     릴리스할 때 태그(v1.0.0)와 이 값이 어긋나면 안 된다.
   -->
   <PropertyGroup>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>JuiceBar</Product>
     <Company>JuiceBar contributors</Company>
     <Copyright>Copyright (c) 2026 JuiceBar contributors</Copyright>

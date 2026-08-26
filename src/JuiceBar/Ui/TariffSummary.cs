@@ -1,5 +1,6 @@
 using System.Text;
 using JuiceBar.Core.Tariff;
+using JuiceBar.Core.Localization;
 
 namespace JuiceBar.Ui;
 
@@ -15,10 +16,10 @@ public static class TariffSummary
     {
         var text = new StringBuilder();
 
-        text.Append($"{tariff.Currency} ({tariff.Symbol}) · 검침 시작 {tariff.BillingCycleStartDay}일");
+        text.Append(Loc.T("summary.header", tariff.Currency, tariff.Symbol, tariff.BillingCycleStartDay));
 
         if (tariff.FixedChargePerMonth > 0)
-            text.Append($" · 기본요금 {Money(tariff.FixedChargePerMonth, tariff)}");
+            text.Append(Loc.T("summary.fixedCharge", Money(tariff.FixedChargePerMonth, tariff)));
 
         text.AppendLine();
         AppendRate(text, tariff);
@@ -26,7 +27,7 @@ public static class TariffSummary
         if (tariff.Taxes.Count > 0)
         {
             var names = tariff.Taxes.Select(t => $"{t.Name} {t.Rate:P1}");
-            text.Append($"세금 — {string.Join(", ", names)}");
+            text.Append(Loc.T("summary.taxes", string.Join(", ", names)));
         }
 
         return text.ToString().TrimEnd();
@@ -37,38 +38,38 @@ public static class TariffSummary
         switch (tariff.Rate)
         {
             case FlatRate flat:
-                text.AppendLine($"단일 단가 — kWh당 {Money(flat.PricePerKwh, tariff)}");
+                text.AppendLine(Loc.T("summary.flat", Money(flat.PricePerKwh, tariff)));
                 break;
 
             case TieredRate tiered:
-                text.AppendLine($"{tiered.Tiers.Count}단계 누진");
+                text.AppendLine(Loc.T("summary.tiered", tiered.Tiers.Count));
 
                 double previous = 0;
                 foreach (var tier in tiered.Tiers)
                 {
-                    string range = tier.UpToKwh is double limit
-                        ? $"{previous:N0}~{limit:N0} kWh"
-                        : $"{previous:N0} kWh 초과";
+                    string price = Money(tier.PricePerKwh, tariff);
 
-                    text.AppendLine($"    {range} — kWh당 {Money(tier.PricePerKwh, tariff)}");
+                    text.AppendLine(tier.UpToKwh is double limit
+                        ? Loc.T("summary.tierRange", previous.ToString("N0"), limit.ToString("N0"), price)
+                        : Loc.T("summary.tierAbove", previous.ToString("N0"), price));
                     previous = tier.UpToKwh ?? previous;
                 }
                 break;
 
             case TouRate tou:
-                text.AppendLine($"시간대별 — 구간 {tou.Periods.Count}개");
+                text.AppendLine(Loc.T("summary.tou", tou.Periods.Count));
 
                 foreach (var period in tou.Periods)
                 {
-                    text.AppendLine(
-                        $"    {period.Name} ({period.Days} {period.From}~{period.To}) — kWh당 {Money(period.PricePerKwh, tariff)}");
+                    text.AppendLine(Loc.T("summary.touPeriod",
+                        period.Name, period.Days, period.From, period.To, Money(period.PricePerKwh, tariff)));
                 }
 
-                text.AppendLine($"    그 외 시간 — kWh당 {Money(tou.DefaultPricePerKwh, tariff)}");
+                text.AppendLine(Loc.T("summary.touDefault", Money(tou.DefaultPricePerKwh, tariff)));
                 break;
 
             default:
-                text.AppendLine("요금이 설정되지 않았습니다.");
+                text.AppendLine(Loc.T("summary.notSet"));
                 break;
         }
     }
