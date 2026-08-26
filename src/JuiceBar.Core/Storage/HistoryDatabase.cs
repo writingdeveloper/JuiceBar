@@ -106,17 +106,26 @@ public sealed class HistoryDatabase : IDisposable
         return result;
     }
 
-    /// <summary>스파크라인용. 최근 <paramref name="minutes"/>분을 오래된 순으로 돌려준다.</summary>
-    public IReadOnlyList<MinuteSample> RecentMinutes(int minutes)
+    /// <summary>
+    /// 스파크라인용. <paramref name="nowUtc"/> 로부터 <paramref name="minutes"/>분 안쪽의
+    /// 기록을 오래된 순으로 돌려준다.
+    ///
+    /// 시간으로 자르는 것이 중요하다. 예전에는 그냥 마지막 N 행을 가져왔는데,
+    /// PC 를 하루 꺼 두거나 누적을 초기화하면 "최근 60분"이라는 이름표를 달고
+    /// 며칠 전 데이터를 그려 보였다. 기록이 없는 구간은 비어 있는 편이 정직하다.
+    /// </summary>
+    public IReadOnlyList<MinuteSample> RecentMinutes(int minutes, DateTimeOffset nowUtc)
     {
         using var command = _connection.CreateCommand();
         command.CommandText = """
             SELECT minute_utc, watt_hours, avg_watts
             FROM minute_samples
+            WHERE minute_utc >= $from
             ORDER BY minute_utc DESC
             LIMIT $limit;
             """;
 
+        command.Parameters.AddWithValue("$from", ToMinuteKey(nowUtc.AddMinutes(-minutes)));
         command.Parameters.AddWithValue("$limit", minutes);
 
         var samples = new List<MinuteSample>(minutes);

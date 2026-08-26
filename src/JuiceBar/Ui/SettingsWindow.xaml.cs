@@ -62,6 +62,7 @@ public partial class SettingsWindow : Window
         CpuIdleBox.Text = Number(profile.Estimation.CpuIdleWatts);
         CpuMaxBox.Text = Number(profile.Estimation.CpuMaxWatts);
         PawnIoStatus.Text = DescribeSensorAccess();
+        ShowElevateButtonIfUseful();
 
         ProfilePathText.Text = Loc.T("settings.profilePath", ProfileDirectory());
 
@@ -129,12 +130,31 @@ public partial class SettingsWindow : Window
         if (_metering.HasEnergyMeter)
             return Loc.T("settings.sensor.energyMeter");
 
-        if (!PawnIoDetector.IsInstalled())
-            return Loc.T("settings.sensor.noPawnIo");
+        return SensorAccess.Advise(false, PawnIoDetector.IsInstalled(), Elevation.IsElevated) switch
+        {
+            SensorAdvice.InstallDriver => Loc.T("settings.sensor.noPawnIo"),
+            SensorAdvice.RunElevated => Loc.T("settings.sensor.notElevated"),
+            _ => Loc.T("settings.sensor.elevated"),
+        };
+    }
 
-        return Loc.T(Elevation.IsElevated
-            ? "settings.sensor.elevated"
-            : "settings.sensor.notElevated");
+    /// <summary>승격만 하면 되는 상태일 때에만 다시 실행 버튼을 보여 준다.</summary>
+    private void ShowElevateButtonIfUseful()
+    {
+        var advice = SensorAccess.Advise(
+            _metering.HasEnergyMeter, PawnIoDetector.IsInstalled(), Elevation.IsElevated);
+
+        ElevateButton.Visibility = advice == SensorAdvice.RunElevated
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void OnRelaunchElevated(object sender, RoutedEventArgs e)
+    {
+        if (!Elevation.TryRelaunchElevated()) return;
+
+        // 새 프로세스가 우리 번호를 받아 우리가 물러날 때까지 기다린다.
+        Application.Current.Shutdown();
     }
 
     // ─────────────────────── 이번 주기 누적 ───────────────────────
@@ -270,7 +290,15 @@ public partial class SettingsWindow : Window
 
         if (!ApplyAutoStart())
         {
-            ValidationText.Text = Loc.T("settings.error.autoStart");
+            // 끄지 못한 경우는 대개 예전 버전이 만든 예약 작업이 남아 있고 권한이 없어서다.
+            // "실패했다"고만 하면 무엇을 해야 할지 알 수 없으므로 이유를 밝혀 준다.
+            bool blockedByTask = AutoStartCheck.IsChecked != true
+                && !Elevation.IsElevated
+                && AutoStart.IsEnabled();
+
+            ValidationText.Text = Loc.T(blockedByTask
+                ? "settings.error.autoStartAdmin"
+                : "settings.error.autoStart");
             return;
         }
 

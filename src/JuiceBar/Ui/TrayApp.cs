@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Forms;
 using JuiceBar.Core;
 using JuiceBar.Core.Platform;
+using JuiceBar.Core.Power;
 using JuiceBar.Core.Storage;
 using JuiceBar.Core.Update;
 
@@ -76,29 +77,56 @@ public sealed class TrayApp : IDisposable
     /// 첫 실행에서 처리할 것들.
     ///
     /// 요금 설정이 먼저다 — 그게 없으면 이 앱이 보여 줄 것이 절반뿐이다.
-    /// PawnIO 안내는 정확도를 높이는 선택 사항이라 그 뒤에 붙인다.
+    /// 센서 안내는 정확도를 높이는 선택 사항이라 그 뒤에 붙인다.
     /// 두 개를 한꺼번에 띄우면 실행하자마자 창 두 개가 겹쳐서 성가시다.
     /// </summary>
     private void RunFirstStart()
     {
         if (!_metering.Profile.IsTariffConfigured)
         {
-            ShowRateWizard(onClosed: PromptForPawnIoIfMissing);
+            ShowRateWizard(onClosed: AdviseOnSensorAccessOnce);
             return;
         }
 
-        PromptForPawnIoIfMissing();
+        AdviseOnSensorAccessOnce();
     }
 
-    private void PromptForPawnIoIfMissing()
+    /// <summary>
+    /// CPU 를 실측할 수 없을 때 무엇을 하면 되는지 한 번만 알려 준다.
+    ///
+    /// "한 번만"이 중요하다. 이건 앱이 못 쓰게 되는 문제가 아니라 정확도가 떨어지는
+    /// 문제이고, 그냥 이대로 쓰겠다는 것도 정당한 선택이다. 그런 사람에게 로그온할
+    /// 때마다 같은 창을 띄우면 그건 안내가 아니라 잔소리다.
+    /// 지나간 뒤에도 설정 → 고급에 같은 내용과 버튼이 그대로 있다.
+    /// </summary>
+    private void AdviseOnSensorAccessOnce()
     {
-        if (PawnIoDetector.IsInstalled()) return;
+        var advice = SensorAccess.Advise(
+            _metering.HasEnergyMeter, PawnIoDetector.IsInstalled(), Elevation.IsElevated);
 
-        // Windows 에너지 미터가 CPU 를 재고 있으면 PawnIO 는 없어도 된다.
-        // 필요 없는 커널 드라이버를 깔라고 권하는 것만큼 나쁜 첫인상도 없다.
-        if (_metering.HasEnergyMeter) return;
+        if (!SensorAccess.NeedsAttention(advice)) return;
+        if (_metering.Profile.HasSeenSensorNotice) return;
 
-        PromptForPawnIo();
+        _metering.UpdateProfile(_metering.Profile with { HasSeenSensorNotice = true });
+
+        if (advice == SensorAdvice.InstallDriver) PromptForPawnIo();
+        else PromptForElevation();
+    }
+
+    /// <summary>
+    /// 드라이버는 깔려 있는데 권한이 없는 경우. 다시 띄우면 곧바로 해결된다.
+    /// </summary>
+    private void PromptForElevation()
+    {
+        var answer = MessageBox.Show(
+            Loc.T("tray.elevate.body"),
+            Loc.T("tray.elevate.title"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
+
+        if (answer != MessageBoxResult.Yes) return;
+
+        if (Elevation.TryRelaunchElevated()) Shutdown();
     }
 
     // ─────────────── 업데이트 확인 ───────────────

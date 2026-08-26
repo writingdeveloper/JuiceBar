@@ -189,7 +189,7 @@ public sealed class MeteringService : IDisposable
 
     public IReadOnlyList<MinuteSample> RecentHistory(int minutes)
     {
-        lock (_gate) return _history.RecentMinutes(minutes);
+        lock (_gate) return _history.RecentMinutes(minutes, DateTimeOffset.UtcNow);
     }
 
     private void Poll()

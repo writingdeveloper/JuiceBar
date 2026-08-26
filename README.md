@@ -15,8 +15,9 @@ cycle goes on. Click it and the cost ticks upward in front of you.
 </p>
 
 **[Download the latest release →](https://github.com/writingdeveloper/JuiceBar/releases/latest)**
-One file, no installer, no .NET runtime required — and on most machines, no
-kernel driver either. See [how accurate is it, really](#how-accurate-is-it-really).
+One file, no installer, no .NET runtime required, and no administrator rights.
+On Windows 11, no kernel driver either — see
+[how accurate is it, really](#how-accurate-is-it-really).
 
 ---
 
@@ -71,8 +72,8 @@ it. What hardware sensors report is the power of individual components:
 
 | Component | Source | Available |
 |---|---|---|
-| CPU package | Windows energy meter (EMI) | most Windows 10/11 machines, no driver, no admin |
-| CPU package | Intel RAPL / AMD SMU, via PawnIO | fallback where the meter is absent |
+| CPU package | Windows energy meter (EMI) | Windows 11, no driver, no admin |
+| CPU package | Intel RAPL / AMD SMU, via PawnIO | Windows 10, and anywhere the meter is absent |
 | Discrete GPU | NVIDIA NVML / AMD ADL | always |
 | Battery charge and discharge | ACPI | laptops only |
 | Motherboard, RAM, drives, fans | — | never measurable |
@@ -131,14 +132,27 @@ Same counter, no driver, no UAC prompt. It also reports *accumulated energy*
 rather than instantaneous power, so spikes between polls land in the total
 instead of being missed.
 
+**Where the meter exists is worth being exact about.** On **Windows 11** the
+platform exposes the CPU's RAPL counters through it, which is why this works
+without a driver. On **Windows 10** it only appears where the machine has real
+metering hardware — a Surface Book, say — so most Windows 10 PCs do not have
+one. Mozilla found the same when they built [power profiling on this API](https://bugzilla.mozilla.org/show_bug.cgi?id=1774844).
+
 [PawnIO](https://pawnio.eu/) — the signed, open-source driver
-LibreHardwareMonitor uses — remains the fallback for hardware that exposes no
-energy meter, and JuiceBar only suggests installing it when it is actually
-needed. Where neither is available the CPU share is estimated from utilisation,
-and the badge in the popup says so plainly rather than pretending otherwise.
+LibreHardwareMonitor uses — covers that gap. JuiceBar suggests it once, and only
+when it would actually help. Where neither is available the CPU share is
+estimated from utilisation, and the badge in the popup says so plainly rather
+than pretending otherwise.
 
 > The driver PawnIO replaced, WinRing0, is on Microsoft's vulnerable-driver
 > blocklist. JuiceBar never ships it.
+
+**JuiceBar does not ask for administrator rights.** It used to, on every launch,
+because reading the CPU meant talking to a kernel driver. With the energy meter
+that is no longer true for most people, and a resident app that throws a UAC
+prompt at you every time you log in had better be buying you something. If your
+machine does need the driver, JuiceBar explains why and offers to restart with
+those rights — once, not every time.
 
 **Both sources can read the same watts.** With PawnIO installed, the energy
 meter and LibreHardwareMonitor report the *same* RAPL counter. Adding them would

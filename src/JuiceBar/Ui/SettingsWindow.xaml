@@ -238,6 +238,18 @@
                                            TextWrapping="Wrap"
                                            Margin="0,0,0,9" />
 
+                                <!--
+                                    드라이버는 있는데 권한이 없을 때만 보인다.
+                                    누르면 승격된 채로 다시 뜬다.
+                                -->
+                                <Button x:Name="ElevateButton"
+                                        Content="{ui:Translate settings.elevate}"
+                                        Style="{StaticResource SubtleButton}"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,0,0,9"
+                                        Visibility="Collapsed"
+                                        Click="OnRelaunchElevated" />
+
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="{ui:Translate settings.cpuIdle}" Style="{StaticResource CaptionText}"
                                                VerticalAlignment="Center" Margin="0,0,8,0" />

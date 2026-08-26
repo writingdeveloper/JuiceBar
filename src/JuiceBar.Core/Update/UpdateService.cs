@@ -247,12 +247,21 @@ public sealed class UpdateService
     /// <summary>업데이트로 교체된 예전 프로세스를 기다리라는 표시.</summary>
     public const string WaitForArgument = "--updated-from";
 
+    /// <summary>
+    /// 승격을 위해 스스로를 다시 띄울 때 쓰는 표시.
+    ///
+    /// 기다려야 하는 이유는 업데이트와 똑같다 — 예전 프로세스가 단일 인스턴스 뮤텍스를
+    /// 놓기 전에 새 프로세스가 뜨면 새 쪽이 "이미 실행 중"이라며 스스로 종료한다.
+    /// 인자 이름을 나눠 둔 건 작업 관리자에서 왜 이 프로세스가 떴는지 보이게 하기 위해서다.
+    /// </summary>
+    public const string RestartArgument = "--restarted-from";
+
     /// <summary>예전 프로세스가 물러나기를 이만큼 기다린다. 그 뒤에는 그냥 진행한다.</summary>
     private static readonly TimeSpan ReplacedProcessTimeout = TimeSpan.FromSeconds(20);
 
     /// <summary>
-    /// 명령줄에 <see cref="WaitForArgument"/> 가 있으면 그 번호의 프로세스가 끝날 때까지 기다린다.
-    /// 업데이트 직후 실행에서만 쓰인다.
+    /// 명령줄에 <see cref="WaitForArgument"/> 나 <see cref="RestartArgument"/> 가 있으면
+    /// 그 번호의 프로세스가 끝날 때까지 기다린다. 업데이트 직후나 승격 재시작에서만 쓰인다.
     /// </summary>
     public static void WaitForReplacedProcess(IReadOnlyList<string>? args)
     {
@@ -279,7 +288,10 @@ public sealed class UpdateService
 
         for (int i = 0; i < args.Count - 1; i++)
         {
-            if (!string.Equals(args[i], WaitForArgument, StringComparison.OrdinalIgnoreCase)) continue;
+            bool handoff = string.Equals(args[i], WaitForArgument, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[i], RestartArgument, StringComparison.OrdinalIgnoreCase);
+
+            if (!handoff) continue;
 
             return int.TryParse(args[i + 1], out int processId) && processId > 0
                 ? processId

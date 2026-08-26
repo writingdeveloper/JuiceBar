@@ -86,6 +86,12 @@ public sealed record DeviceProfile
     public bool IsTariffConfigured { get; init; }
 
     /// <summary>
+    /// CPU 측정 안내를 이미 한 번 보여 줬는지.
+    /// 정확도를 포기하고 그냥 쓰는 것도 선택이므로, 두 번은 묻지 않는다.
+    /// </summary>
+    public bool HasSeenSensorNotice { get; init; }
+
+    /// <summary>
     /// 예전 형식으로 저장된 프로필을 지금 형식에 맞춘다. 이미 최신이면 그대로 돌려준다.
     ///
     /// 채널 선택은 첫 실행에 한 번 정해지고 그 뒤로는 손대지 않는다. 그래서 더 나은

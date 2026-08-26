@@ -76,6 +76,57 @@ public sealed class HistoryDatabaseTests : IDisposable
         Assert.Equal(0.5, _history.SumWattHours(Noon, Noon.AddMinutes(10)), precision: 6);
     }
 
+    // ── 스파크라인이 보는 창 ───────────────────────────────
+    //
+    // "최근 60분"이라는 이름표를 달고 며칠 전 데이터를 그리면 안 된다.
+    // 예전에는 시간과 무관하게 마지막 N 행을 가져와서 실제로 그런 일이 있었다.
+
+    [Fact]
+    public void The_recent_window_is_measured_in_time_not_in_rows()
+    {
+        Record(Noon.AddMinutes(-5), 1.0);
+        Record(Noon.AddMinutes(-2), 2.0);
+
+        // 하루 전 기록. 행 수로 세면 이것도 "최근"에 들어와 버린다.
+        Record(Noon.AddDays(-1), 9.0);
+
+        var recent = _history.RecentMinutes(60, Noon);
+
+        Assert.Equal(2, recent.Count);
+        Assert.All(recent, s => Assert.True(s.MinuteUtc >= Noon.AddMinutes(-60)));
+    }
+
+    [Fact]
+    public void An_idle_machine_shows_nothing_rather_than_something_stale()
+    {
+        // PC 를 하루 꺼 뒀다면 최근 한 시간에는 아무 일도 없었던 게 맞다.
+        Record(Noon.AddDays(-1), 5.0);
+
+        Assert.Empty(_history.RecentMinutes(60, Noon));
+    }
+
+    [Fact]
+    public void The_window_is_returned_oldest_first_so_the_line_runs_left_to_right()
+    {
+        Record(Noon.AddMinutes(-3), 1.0);
+        Record(Noon.AddMinutes(-1), 2.0);
+        Record(Noon.AddMinutes(-2), 3.0);
+
+        var recent = _history.RecentMinutes(60, Noon);
+
+        Assert.Equal(
+            [Noon.AddMinutes(-3), Noon.AddMinutes(-2), Noon.AddMinutes(-1)],
+            recent.Select(s => s.MinuteUtc));
+    }
+
+    [Fact]
+    public void The_window_never_returns_more_points_than_asked_for()
+    {
+        for (int i = 1; i <= 90; i++) Record(Noon.AddMinutes(-i), 0.1);
+
+        Assert.Equal(60, _history.RecentMinutes(60, Noon).Count);
+    }
+
     public void Dispose()
     {
         _history.Dispose();

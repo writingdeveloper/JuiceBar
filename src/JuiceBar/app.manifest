@@ -6,11 +6,17 @@
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
         <!--
-          CPU 패키지 전력은 PawnIO 커널 드라이버를 통해서만 읽을 수 있고,
-          드라이버와 통신하려면 승격된 권한이 필요하다.
-          권한 없이 뜨면 GPU만 실측되고 CPU는 추정으로 떨어진다.
+          평범한 권한으로 뜬다. 상주 앱이 로그온할 때마다 UAC 창을 띄우는 것은
+          그만한 값어치가 있을 때만 할 일인데, 이제 대개는 값어치가 없다.
+
+          Windows 에너지 미터가 CPU 패키지 전력을 평범한 권한으로 내주기 때문이다
+          (Windows 11 은 CPU 의 RAPL 값을 그대로 노출한다). 미터가 없는 기기 —
+          대부분의 Windows 10 — 에서만 PawnIO 드라이버가 필요하고, 그 드라이버에
+          말을 걸려면 승격이 필요하다. 그럴 때는 앱이 이유를 설명하고 다시 띄울지 묻는다.
+
+          필요한 사람만 승격하고, 나머지는 UAC 창을 다시는 보지 않는다.
         -->
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>
