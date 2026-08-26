@@ -63,8 +63,11 @@ jobs:
         with:
           files: JuiceBar.exe
           body: |
-            Download `JuiceBar.exe` and run it.
+            Download `JuiceBar.exe` and run it. No installer, no runtime, no
+            administrator rights.
 
-            For real CPU power readings, install the
-            [PawnIO](https://pawnio.eu/) driver as well — without it the CPU
-            share is estimated from utilisation and the popup will say so.
+            On Windows 11 the CPU is measured through the Windows energy meter,
+            so nothing else is needed. On Windows 10 that meter usually is not
+            there — JuiceBar will say so and point you at the
+            [PawnIO](https://pawnio.eu/) driver, and until then the CPU share is
+            estimated from utilisation with the popup labelling it as such.
