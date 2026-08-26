@@ -230,28 +230,41 @@ public sealed class UpdateService
         string current = Environment.ProcessPath
             ?? throw new InvalidOperationException("현재 실행 파일 경로를 알 수 없습니다.");
 
-        string backup = current + BackupSuffix;
-
-        if (File.Exists(backup)) TryDelete(backup);
-
-        File.Move(current, backup);
-
-        try
-        {
-            File.Move(downloadedPath, current);
-        }
-        catch (Exception)
-        {
-            // 새 파일을 제자리에 못 놓았다면 원래 파일을 돌려놓는다.
-            File.Move(backup, current);
-            throw;
-        }
+        SwapExecutable(current, downloadedPath);
 
         Process.Start(new ProcessStartInfo
         {
             FileName = current,
             UseShellExecute = true,
         });
+    }
+
+    /// <summary>
+    /// <paramref name="target"/> 자리에 <paramref name="replacement"/> 를 놓는다.
+    /// 밀어 둔 예전 파일의 경로를 돌려준다.
+    ///
+    /// 실패하면 원래 파일을 제자리에 되돌린다 — 업데이트가 깨지는 것보다
+    /// 예전 버전이라도 돌아가는 편이 낫다.
+    /// </summary>
+    internal static string SwapExecutable(string target, string replacement)
+    {
+        string backup = target + BackupSuffix;
+
+        if (File.Exists(backup)) TryDelete(backup);
+
+        File.Move(target, backup);
+
+        try
+        {
+            File.Move(replacement, target);
+        }
+        catch (Exception)
+        {
+            File.Move(backup, target);
+            throw;
+        }
+
+        return backup;
     }
 
     /// <summary>

@@ -68,4 +68,71 @@ public class UpdateServiceTests
 
         Assert.True(newer > current);
     }
+
+    // ── 실행 파일 교체 ────────────────────────────────────────
+    //
+    // 여기가 잘못되면 사용자의 설치본이 사라진다. 실제 파일로 확인한다.
+
+    private sealed class TempDirectory : IDisposable
+    {
+        public string Path { get; } = Directory.CreateTempSubdirectory("juicebar-test").FullName;
+
+        public string File(string name, string content)
+        {
+            string full = System.IO.Path.Combine(Path, name);
+            System.IO.File.WriteAllText(full, content);
+            return full;
+        }
+
+        public void Dispose()
+        {
+            try { Directory.Delete(Path, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void Swapping_puts_the_new_file_in_place_and_keeps_the_old_one_aside()
+    {
+        using var temp = new TempDirectory();
+
+        string target = temp.File("JuiceBar.exe", "old version");
+        string replacement = temp.File("downloaded.exe", "new version");
+
+        string backup = UpdateService.SwapExecutable(target, replacement);
+
+        Assert.Equal("new version", File.ReadAllText(target));
+        Assert.Equal("old version", File.ReadAllText(backup));
+        Assert.False(File.Exists(replacement));
+    }
+
+    [Fact]
+    public void Swapping_overwrites_a_backup_left_by_an_earlier_update()
+    {
+        using var temp = new TempDirectory();
+
+        string target = temp.File("JuiceBar.exe", "version 2");
+        temp.File("JuiceBar.exe.old", "version 1");
+        string replacement = temp.File("downloaded.exe", "version 3");
+
+        string backup = UpdateService.SwapExecutable(target, replacement);
+
+        Assert.Equal("version 3", File.ReadAllText(target));
+        Assert.Equal("version 2", File.ReadAllText(backup));
+    }
+
+    [Fact]
+    public void A_failed_swap_leaves_the_original_executable_in_place()
+    {
+        using var temp = new TempDirectory();
+
+        string target = temp.File("JuiceBar.exe", "old version");
+        string missing = Path.Combine(temp.Path, "never-downloaded.exe");
+
+        Assert.ThrowsAny<IOException>(() => UpdateService.SwapExecutable(target, missing));
+
+        // 이것이 핵심이다 — 업데이트가 실패해도 쓰던 버전은 그대로 남아야 한다.
+        Assert.True(File.Exists(target));
+        Assert.Equal("old version", File.ReadAllText(target));
+        Assert.False(File.Exists(target + ".old"));
+    }
 }
