@@ -1,0 +1,231 @@
+<Window x:Class="JuiceBar.Ui.RateWizardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="JuiceBar — 전기요금 설정"
+        Width="560" Height="720"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        MinWidth="520" MinHeight="600"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+    <Window.Resources>
+        <Style x:Key="StepNumber" TargetType="Border">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Background" Value="{DynamicResource CardHoverBrush}" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+
+        <Style x:Key="StepTitle" TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="26,22,22,0">
+            <StackPanel Margin="0,0,4,20">
+
+                <TextBlock Text="전기요금 설정"
+                           Style="{StaticResource BodyText}"
+                           FontSize="18" FontWeight="SemiBold" />
+
+                <TextBlock Style="{StaticResource CaptionText}"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"
+                           Text="요금은 지역마다 다르고 구조도 제각각입니다. 직접 채우는 대신 AI에게 물어보세요. 아래 프롬프트를 복사해 붙여 넣고, 돌아온 답변을 그대로 다시 붙여 넣으면 끝입니다." />
+
+                <!-- ① -->
+                <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
+                    <Border Style="{StaticResource StepNumber}">
+                        <TextBlock Text="1" Style="{StaticResource BodyText}"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="사는 곳과 통화를 적고 프롬프트를 복사하세요" Style="{StaticResource StepTitle}" />
+                </StackPanel>
+
+                <Grid Margin="32,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="88" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="사는 곳"
+                               Style="{StaticResource CaptionText}"
+                               VerticalAlignment="Center" Margin="0,0,8,0" />
+
+                    <TextBox x:Name="RegionBox"
+                             Grid.Column="1"
+                             Style="{StaticResource FieldBox}"
+                             VerticalContentAlignment="Center"
+                             TextChanged="OnRegionChanged" />
+
+                    <TextBlock Grid.Column="2" Text="통화"
+                               Style="{StaticResource CaptionText}"
+                               VerticalAlignment="Center" Margin="14,0,8,0" />
+
+                    <TextBox x:Name="CurrencyBox"
+                             Grid.Column="3"
+                             Style="{StaticResource FieldBox}"
+                             VerticalContentAlignment="Center"
+                             TextChanged="OnRegionChanged" />
+                </Grid>
+
+                <Grid Margin="32,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Style="{StaticResource LabelText}"
+                               FontWeight="Normal"
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0"
+                               TextWrapping="Wrap"
+                               Text="예: 서울 / KRW · Berlin / EUR — 통화는 비워도 됩니다" />
+
+                    <Button x:Name="CopyButton"
+                            Grid.Column="1"
+                            Content="프롬프트 복사"
+                            Style="{StaticResource AccentButton}"
+                            Click="OnCopyPrompt" />
+                </Grid>
+
+                <Border Style="{StaticResource Card}" Margin="32,10,0,0">
+                    <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="PromptPreview"
+                                   Style="{StaticResource CaptionText}"
+                                   Foreground="{DynamicResource TextTertiaryBrush}"
+                                   FontFamily="Consolas, Courier New"
+                                   FontSize="11"
+                                   TextWrapping="Wrap" />
+                    </ScrollViewer>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" Margin="32,8,0,0">
+                    <TextBlock Text="붙여 넣을 곳:" Style="{StaticResource LabelText}"
+                               FontWeight="Normal" VerticalAlignment="Center" />
+                    <Button Content="Gemini" Style="{StaticResource SubtleButton}"
+                            Tag="https://gemini.google.com/app" Click="OnOpenAi" />
+                    <Button Content="ChatGPT" Style="{StaticResource SubtleButton}"
+                            Tag="https://chatgpt.com/" Click="OnOpenAi" />
+                    <Button Content="Claude" Style="{StaticResource SubtleButton}"
+                            Tag="https://claude.ai/new" Click="OnOpenAi" />
+                </StackPanel>
+
+                <!-- ② -->
+                <StackPanel Orientation="Horizontal" Margin="0,26,0,0">
+                    <Border Style="{StaticResource StepNumber}">
+                        <TextBlock Text="2" Style="{StaticResource BodyText}"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="AI 답변을 그대로 붙여 넣으세요" Style="{StaticResource StepTitle}" />
+                </StackPanel>
+
+                <TextBlock Style="{StaticResource LabelText}"
+                           FontWeight="Normal"
+                           Margin="34,8,0,0"
+                           Text="설명이 섞여 있어도 됩니다. JSON 부분만 알아서 찾아냅니다." />
+
+                <TextBox x:Name="ResponseBox"
+                         Style="{StaticResource FieldBox}"
+                         Margin="32,8,0,0"
+                         Height="130"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         VerticalContentAlignment="Top" />
+
+                <StackPanel Orientation="Horizontal" Margin="32,8,0,0">
+                    <Button Content="붙여넣고 적용"
+                            Style="{StaticResource AccentButton}"
+                            Click="OnPasteAndApply" />
+                    <Button Content="입력한 내용으로 적용"
+                            Style="{StaticResource SubtleButton}"
+                            Margin="6,0,0,0"
+                            Click="OnApply" />
+                    <Button Content="현재 설정 꺼내기"
+                            Style="{StaticResource SubtleButton}"
+                            ToolTip="지금 적용된 요금을 JSON 으로 꺼내 직접 고칠 수 있습니다"
+                            Click="OnEditCurrentJson" />
+                </StackPanel>
+
+                <Border x:Name="ResultCard"
+                        Style="{StaticResource Card}"
+                        Margin="32,12,0,0"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="ResultText"
+                               Style="{StaticResource CaptionText}"
+                               TextWrapping="Wrap" />
+                </Border>
+
+                <!-- ③ -->
+                <StackPanel Orientation="Horizontal" Margin="0,26,0,0">
+                    <Border Style="{StaticResource StepNumber}">
+                        <TextBlock Text="3" Style="{StaticResource BodyText}"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="한 달 예산 (선택)" Style="{StaticResource StepTitle}" />
+                </StackPanel>
+
+                <Grid Margin="32,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="130" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox x:Name="BudgetBox" Grid.Column="0" Style="{StaticResource FieldBox}" />
+
+                    <!-- 인식된 통화 기호를 붙여 어떤 단위로 넣어야 할지 알려 준다. -->
+                    <TextBlock x:Name="BudgetUnit"
+                               Grid.Column="1"
+                               Style="{StaticResource CaptionText}"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0" />
+
+                    <TextBlock Grid.Column="2"
+                               Style="{StaticResource LabelText}"
+                               FontWeight="Normal"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"
+                               TextWrapping="Wrap"
+                               Text="연료계가 이 금액을 가득 찬 기준으로 삼습니다. 비워 두면 전력(W) 기준으로 찹니다." />
+                </Grid>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" Background="{DynamicResource CardBrush}" Padding="26,14">
+            <Grid>
+                <Button Content="고급 설정..."
+                        Style="{StaticResource SubtleButton}"
+                        HorizontalAlignment="Left"
+                        Click="OnOpenAdvanced" />
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="나중에" Style="{StaticResource SubtleButton}" Click="OnCancel" />
+                    <Button x:Name="SaveButton"
+                            Content="저장"
+                            Style="{StaticResource AccentButton}"
+                            Margin="8,0,0,0"
+                            Click="OnSave" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

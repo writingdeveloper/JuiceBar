@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>JuiceBar</AssemblyName>
+    <RootNamespace>JuiceBar</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      WinForms 를 함께 켜면 System.Drawing 과 System.Windows.Forms 가 암시적 using 에 들어와
+      Brush · Point · Color · Application 같은 이름이 WPF 쪽과 전부 충돌한다.
+      기본은 WPF 로 두고, 트레이 아이콘처럼 GDI+ 가 필요한 파일에서만 명시적으로 가져온다.
+    -->
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JuiceBar.Core\JuiceBar.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,31 @@
+{
+  "_comment": "Japan, TEPCO-style three-tier residential plan.",
+  "Currency": "JPY",
+  "Symbol": "円",
+  "BillingCycleStartDay": 1,
+  "FixedChargePerMonth": 1247,
+  "Taxes": [
+    {
+      "Name": "消費税",
+      "Rate": 0.1
+    }
+  ],
+  "Rate": {
+    "kind": "tiered",
+    "Tiers": [
+      {
+        "UpToKwh": 120,
+        "PricePerKwh": 29.8
+      },
+      {
+        "UpToKwh": 300,
+        "PricePerKwh": 36.4
+      },
+      {
+        "UpToKwh": null,
+        "PricePerKwh": 40.5
+      }
+    ]
+  },
+  "MonthlyBudget": 8000
+}

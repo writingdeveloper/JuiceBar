@@ -1,0 +1,13 @@
+{
+  "_comment": "Starting point for most users. Replace pricePerKwh with your local rate.",
+  "Currency": "USD",
+  "Symbol": "$",
+  "BillingCycleStartDay": 1,
+  "FixedChargePerMonth": 0,
+  "Taxes": [],
+  "Rate": {
+    "kind": "flat",
+    "PricePerKwh": 0.17
+  },
+  "MonthlyBudget": 40
+}

@@ -1,0 +1,249 @@
+<Window x:Class="JuiceBar.Ui.PopupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:JuiceBar.Ui"
+        Title="JuiceBar"
+        Width="352" SizeToContent="Height"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+    <Grid Background="Transparent" Margin="18,14,18,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 머리말 -->
+        <Grid Grid.Row="0">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="JuiceBar"
+                           Style="{StaticResource BodyText}"
+                           FontWeight="SemiBold" />
+                <TextBlock x:Name="DeviceLabel"
+                           Style="{StaticResource CaptionText}"
+                           Margin="8,1,0,0"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="ModeButton"
+                        Style="{StaticResource SubtleButton}"
+                        Click="OnToggleMode"
+                        ToolTip="게이지 기준 전환" />
+                <Button Content="설정"
+                        Style="{StaticResource SubtleButton}"
+                        Click="OnOpenSettings" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 연료계 -->
+        <Grid Grid.Row="1" Height="164" Margin="0,6,0,0">
+            <ui:FuelGauge x:Name="Gauge"
+                          TrackBrush="{DynamicResource GaugeTrackBrush}"
+                          NeedleBrush="{DynamicResource NeedleBrush}"
+                          LabelBrush="{DynamicResource TextTertiaryBrush}" />
+
+            <!-- 계기판 한가운데에 현재 값을 얹는다. -->
+            <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,4">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock x:Name="PrimaryValue"
+                               Style="{StaticResource DisplayText}"
+                               FontSize="33"
+                               Text="—" />
+                    <TextBlock x:Name="PrimaryUnit"
+                               Style="{StaticResource BodyText}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Bottom"
+                               Margin="4,0,0,6"
+                               Text="W" />
+                </StackPanel>
+
+                <TextBlock x:Name="GaugeCaption"
+                           Style="{StaticResource CaptionText}"
+                           HorizontalAlignment="Center"
+                           Margin="0,1,0,0" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 이번 주기 누적 요금 — 계량기처럼 계속 올라간다 -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,10,0,0">
+            <StackPanel>
+                <Grid>
+                    <TextBlock x:Name="CycleLabel" Text="이번 달 누적" Style="{StaticResource LabelText}" />
+                    <TextBlock x:Name="CycleKwh"
+                               Style="{StaticResource LabelText}"
+                               FontWeight="Normal"
+                               HorizontalAlignment="Right" />
+                </Grid>
+
+                <!-- 자릿수가 바뀌어도 흔들리지 않도록 왼쪽 정렬로 고정한다. -->
+                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                    <TextBlock x:Name="CostPrefix"
+                               Style="{StaticResource BodyText}"
+                               FontSize="21" FontWeight="SemiBold"
+                               VerticalAlignment="Bottom" Margin="0,0,1,2" />
+                    <TextBlock x:Name="CostMain"
+                               Style="{StaticResource BodyText}"
+                               FontFamily="{StaticResource DisplayFont}"
+                               FontSize="27" FontWeight="SemiBold"
+                               Typography.NumeralAlignment="Tabular"
+                               VerticalAlignment="Bottom" />
+                    <TextBlock x:Name="CostFraction"
+                               Style="{StaticResource BodyText}"
+                               Foreground="{DynamicResource TextTertiaryBrush}"
+                               FontSize="15"
+                               Typography.NumeralAlignment="Tabular"
+                               VerticalAlignment="Bottom" Margin="0,0,0,2" />
+                    <TextBlock x:Name="CostSuffix"
+                               Style="{StaticResource BodyText}"
+                               FontSize="17" FontWeight="SemiBold"
+                               VerticalAlignment="Bottom" Margin="2,0,0,2" />
+                </StackPanel>
+
+                <TextBlock x:Name="CostRate"
+                           Style="{StaticResource CaptionText}"
+                           Foreground="{DynamicResource TextTertiaryBrush}"
+                           Margin="0,2,0,0" />
+
+                <!-- 오늘 · 월말 예상 -->
+                <Border BorderBrush="{DynamicResource StrokeBrush}"
+                        BorderThickness="0,1,0,0"
+                        Margin="0,10,0,0"
+                        Padding="0,9,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="오늘" Style="{StaticResource CaptionText}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TodayKwh"
+                                   Style="{StaticResource NumericText}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   MinWidth="76" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" x:Name="TodayCost"
+                                   Style="{StaticResource NumericText}"
+                                   MinWidth="88" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="월말 예상"
+                                   Style="{StaticResource CaptionText}" Margin="0,6,0,0" />
+                        <TextBlock Grid.Row="1" Grid.Column="2" x:Name="ProjectedCost"
+                                   Style="{StaticResource NumericText}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,6,0,0" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- 최근 추이 -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="44" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="2,0,2,4">
+                <TextBlock Text="최근 60분" Style="{StaticResource LabelText}" />
+                <TextBlock x:Name="PeakLabel" Style="{StaticResource LabelText}" HorizontalAlignment="Right" />
+            </Grid>
+
+            <ui:Sparkline Grid.Row="1" x:Name="Trend"
+                          LineBrush="{DynamicResource AccentBrush}" />
+        </Grid>
+
+        <!-- 누진 구간 경고 (해당할 때만 보인다) -->
+        <Border Grid.Row="4"
+                x:Name="WarningCard"
+                Background="{DynamicResource WarningBackgroundBrush}"
+                CornerRadius="8"
+                Padding="11,8"
+                Margin="0,12,0,0"
+                Visibility="Collapsed">
+            <TextBlock x:Name="WarningText"
+                       Style="{StaticResource CaptionText}"
+                       Foreground="{DynamicResource WarningTextBrush}"
+                       TextWrapping="Wrap" />
+        </Border>
+
+        <!-- 새 버전 알림 (있을 때만 보인다) -->
+        <Border Grid.Row="5"
+                x:Name="UpdateCard"
+                Background="{DynamicResource CardBrush}"
+                CornerRadius="8"
+                Padding="11,9"
+                Margin="0,12,0,0"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock x:Name="UpdateTitle"
+                               Style="{StaticResource BodyText}"
+                               FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock x:Name="UpdateDetail"
+                               Style="{StaticResource LabelText}"
+                               FontWeight="Normal"
+                               Margin="0,2,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Button x:Name="UpdateButton"
+                        Grid.Column="1"
+                        Content="업데이트"
+                        Style="{StaticResource AccentButton}"
+                        VerticalAlignment="Center"
+                        Margin="10,0,0,0"
+                        Click="OnApplyUpdate" />
+            </Grid>
+        </Border>
+
+        <!-- 측정 품질 배지 -->
+        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="2,12,0,0">
+            <Ellipse x:Name="QualityDot" Width="7" Height="7" VerticalAlignment="Center" />
+            <TextBlock x:Name="QualityText"
+                       Style="{StaticResource LabelText}"
+                       FontWeight="Normal"
+                       Margin="7,0,0,0"
+                       VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- 꼬리말 -->
+        <Grid Grid.Row="7" Margin="0,14,0,0">
+            <Button x:Name="RateButton"
+                    Content="요금 설정"
+                    Style="{StaticResource AccentButton}"
+                    HorizontalAlignment="Left"
+                    Click="OnOpenRateWizard" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="보정"
+                        Style="{StaticResource SubtleButton}"
+                        ToolTip="전력계 값으로 측정 정확도를 높입니다"
+                        Click="OnOpenCalibration" />
+                <Button Content="종료"
+                        Style="{StaticResource SubtleButton}"
+                        Click="OnExit" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

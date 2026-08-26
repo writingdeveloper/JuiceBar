@@ -1,0 +1,17 @@
+<Project>
+
+  <!--
+    버전은 여기 한 곳에서만 관리한다.
+    자동 업데이트가 이 값을 GitHub 릴리스 태그와 비교하므로,
+    릴리스할 때 태그(v1.0.0)와 이 값이 어긋나면 안 된다.
+  -->
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <Product>JuiceBar</Product>
+    <Company>JuiceBar contributors</Company>
+    <Copyright>Copyright (c) 2026 JuiceBar contributors</Copyright>
+    <RepositoryUrl>https://github.com/writingdeveloper/JuiceBar</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+</Project>

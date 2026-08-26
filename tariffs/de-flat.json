@@ -1,0 +1,13 @@
+{
+  "_comment": "Germany, typical residential: flat rate plus a monthly standing charge. VAT already included in the per-kWh price on most bills.",
+  "Currency": "EUR",
+  "Symbol": "€",
+  "BillingCycleStartDay": 1,
+  "FixedChargePerMonth": 12.0,
+  "Taxes": [],
+  "Rate": {
+    "kind": "flat",
+    "PricePerKwh": 0.35
+  },
+  "MonthlyBudget": 60
+}

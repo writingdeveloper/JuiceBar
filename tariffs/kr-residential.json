@@ -1,0 +1,35 @@
+{
+  "_comment": "South Korea, residential low-voltage. Progressive tiers reset each billing cycle. Rates change yearly - check your bill.",
+  "Currency": "KRW",
+  "Symbol": "원",
+  "BillingCycleStartDay": 1,
+  "FixedChargePerMonth": 1600,
+  "Taxes": [
+    {
+      "Name": "부가세",
+      "Rate": 0.1
+    },
+    {
+      "Name": "전력기금",
+      "Rate": 0.037
+    }
+  ],
+  "Rate": {
+    "kind": "tiered",
+    "Tiers": [
+      {
+        "UpToKwh": 200,
+        "PricePerKwh": 120.0
+      },
+      {
+        "UpToKwh": 400,
+        "PricePerKwh": 214.6
+      },
+      {
+        "UpToKwh": null,
+        "PricePerKwh": 307.3
+      }
+    ]
+  },
+  "MonthlyBudget": 30000
+}

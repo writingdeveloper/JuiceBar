@@ -1,0 +1,111 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using JuiceBar.Core.Platform;
+using JuiceBar.Core.Power;
+using JuiceBar.Core.Tariff;
+
+namespace JuiceBar.Core.Storage;
+
+/// <summary>트레이 아이콘 게이지가 무엇을 기준으로 차오를지.</summary>
+public enum GaugeMode
+{
+    /// <summary>이번 청구 주기 누적 요금 / 예산. 주유소 연료계에 해당하는 쪽.</summary>
+    Budget,
+
+    /// <summary>현재 전력 / 이 장비의 최대 전력. 지금 무엇이 전기를 먹는지 보는 쪽.</summary>
+    Instant,
+}
+
+/// <summary>
+/// 장비 하나에 딸린 모든 설정과 학습 결과.
+/// 장비마다 전력 특성이 완전히 다르므로 절대 공유하지 않는다.
+/// </summary>
+public sealed record DeviceProfile
+{
+    public string DeviceId { get; init; } = DeviceIdentity.Current;
+
+    public string DisplayName { get; init; } = DeviceIdentity.FriendlyName;
+
+    public TariffConfig Tariff { get; init; } = new();
+
+    public CalibrationModel Calibration { get; init; } = CalibrationModel.Default;
+
+    /// <summary>CPU 센서를 못 읽을 때 쓰는 추정 파라미터.</summary>
+    public EstimationSettings Estimation { get; init; } = new();
+
+    /// <summary>합산에 포함할 전력 채널. 비어 있으면 첫 폴링 때 휴리스틱으로 채운다.</summary>
+    public IReadOnlyList<string> SelectedChannelIds { get; init; } = [];
+
+    /// <summary>사용자가 입력한 캘리브레이션 표본. 나중에 점을 더 찍어 정밀도를 올릴 수 있게 보관한다.</summary>
+    public IReadOnlyList<CalibrationPoint> CalibrationPoints { get; init; } = [];
+
+    public GaugeMode GaugeMode { get; init; } = GaugeMode.Budget;
+
+    /// <summary>관측된 최대 전력. 순간 모드 게이지의 만재 기준이다.</summary>
+    public double ObservedPeakWatts { get; init; } = 500;
+
+    public bool StartWithWindows { get; init; }
+
+    /// <summary>GitHub 릴리스에서 새 버전을 자동으로 확인할지.</summary>
+    public bool CheckForUpdates { get; init; } = true;
+
+    /// <summary>이 장비가 노트북인지. 배터리 자동 캘리브레이션 가능 여부를 뜻한다.</summary>
+    public bool HasBattery { get; init; }
+
+    /// <summary>
+    /// 사용자가 요금을 실제로 설정했는지. 기본값 그대로면 첫 실행으로 보고
+    /// 요금 마법사를 띄운다. 아무 설정 없이 엉뚱한 금액을 보여 주는 것보다 낫다.
+    /// </summary>
+    public bool IsTariffConfigured { get; init; }
+}
+
+/// <summary>프로필을 %APPDATA%\JuiceBar\devices\&lt;id&gt;\profile.json 에 읽고 쓴다.</summary>
+public sealed class ProfileStore
+{
+    private static readonly JsonSerializerOptions _json = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    public string DirectoryPath { get; }
+
+    public string FilePath => Path.Combine(DirectoryPath, "profile.json");
+
+    public ProfileStore(string? rootOverride = null)
+    {
+        string root = rootOverride ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "JuiceBar");
+
+        DirectoryPath = Path.Combine(root, "devices", DeviceIdentity.Current);
+        Directory.CreateDirectory(DirectoryPath);
+    }
+
+    public DeviceProfile Load()
+    {
+        if (!File.Exists(FilePath)) return new DeviceProfile();
+
+        try
+        {
+            string json = File.ReadAllText(FilePath);
+            return JsonSerializer.Deserialize<DeviceProfile>(json, _json) ?? new DeviceProfile();
+        }
+        catch (Exception)
+        {
+            // 손상된 프로필 때문에 앱이 못 뜨는 것이 가장 나쁘다. 기본값으로 살려 둔다.
+            return new DeviceProfile();
+        }
+    }
+
+    public void Save(DeviceProfile profile)
+    {
+        string json = JsonSerializer.Serialize(profile, _json);
+
+        // 저장 중 전원이 끊겨도 기존 파일이 남도록 임시 파일에 쓰고 교체한다.
+        string temp = FilePath + ".tmp";
+        File.WriteAllText(temp, json);
+        File.Move(temp, FilePath, overwrite: true);
+    }
+}

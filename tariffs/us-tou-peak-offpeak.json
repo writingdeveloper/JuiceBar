@@ -1,0 +1,35 @@
+{
+  "_comment": "United States, time-of-use plan. Weekday afternoons cost more. Adjust hours to match your utility.",
+  "Currency": "USD",
+  "Symbol": "$",
+  "BillingCycleStartDay": 15,
+  "FixedChargePerMonth": 10.0,
+  "Taxes": [
+    {
+      "Name": "Sales tax",
+      "Rate": 0.0725
+    }
+  ],
+  "Rate": {
+    "kind": "tou",
+    "Periods": [
+      {
+        "Name": "peak",
+        "Days": "mon-fri",
+        "From": "16:00",
+        "To": "21:00",
+        "PricePerKwh": 0.42
+      },
+      {
+        "Name": "midpeak",
+        "Days": "mon-fri",
+        "From": "09:00",
+        "To": "16:00",
+        "PricePerKwh": 0.24
+      }
+    ],
+    "DefaultPeriodName": "offpeak",
+    "DefaultPricePerKwh": 0.14
+  },
+  "MonthlyBudget": 50
+}
