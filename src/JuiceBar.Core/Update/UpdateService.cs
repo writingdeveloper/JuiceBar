@@ -233,11 +233,60 @@ public sealed class UpdateService
 
         SwapExecutable(current, downloadedPath);
 
+        // 새 프로세스에게 우리 번호를 넘겨 준다.
+        // 우리가 아직 단일 인스턴스 뮤텍스를 쥐고 있어서, 그쪽이 곧바로 뜨면
+        // "이미 실행 중" 이라며 스스로 종료해 버린다. 그러면 업데이트 후 아무것도 남지 않는다.
         Process.Start(new ProcessStartInfo
         {
             FileName = current,
+            Arguments = $"{WaitForArgument} {Environment.ProcessId}",
             UseShellExecute = true,
         });
+    }
+
+    /// <summary>업데이트로 교체된 예전 프로세스를 기다리라는 표시.</summary>
+    public const string WaitForArgument = "--updated-from";
+
+    /// <summary>예전 프로세스가 물러나기를 이만큼 기다린다. 그 뒤에는 그냥 진행한다.</summary>
+    private static readonly TimeSpan ReplacedProcessTimeout = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// 명령줄에 <see cref="WaitForArgument"/> 가 있으면 그 번호의 프로세스가 끝날 때까지 기다린다.
+    /// 업데이트 직후 실행에서만 쓰인다.
+    /// </summary>
+    public static void WaitForReplacedProcess(IReadOnlyList<string>? args)
+    {
+        if (ParseReplacedProcessId(args) is not int processId) return;
+
+        try
+        {
+            using var previous = Process.GetProcessById(processId);
+            previous.WaitForExit((int)ReplacedProcessTimeout.TotalMilliseconds);
+        }
+        catch (ArgumentException)
+        {
+            // 이미 끝났다. 기다릴 것이 없다.
+        }
+        catch (Exception)
+        {
+            // 접근이 막혀도 계속 진행한다. 최악의 경우 단일 인스턴스 안내가 뜰 뿐이다.
+        }
+    }
+
+    internal static int? ParseReplacedProcessId(IReadOnlyList<string>? args)
+    {
+        if (args is null) return null;
+
+        for (int i = 0; i < args.Count - 1; i++)
+        {
+            if (!string.Equals(args[i], WaitForArgument, StringComparison.OrdinalIgnoreCase)) continue;
+
+            return int.TryParse(args[i + 1], out int processId) && processId > 0
+                ? processId
+                : null;
+        }
+
+        return null;
     }
 
     /// <summary>

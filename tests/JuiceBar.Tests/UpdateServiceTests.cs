@@ -69,6 +69,85 @@ public class UpdateServiceTests
         Assert.True(newer > current);
     }
 
+    // ── 업데이트 후 재시작 ────────────────────────────────────
+    //
+    // 1.0.0 에서 실제로 겪은 문제: 새 프로세스가 예전 프로세스보다 먼저 떠서
+    // 단일 인스턴스 검사에 걸려 스스로 종료했고, 곧이어 예전 쪽도 끝나
+    // 업데이트 후 아무것도 남지 않았다. 그래서 넘겨받은 번호를 반드시 읽어야 한다.
+
+    [Fact]
+    public void The_previous_process_id_is_read_from_the_command_line()
+    {
+        var args = new[] { UpdateService.WaitForArgument, "4321" };
+
+        Assert.Equal(4321, UpdateService.ParseReplacedProcessId(args));
+    }
+
+    [Fact]
+    public void Other_arguments_around_it_do_not_matter()
+    {
+        var args = new[] { "--something", UpdateService.WaitForArgument, "77", "--else" };
+
+        Assert.Equal(77, UpdateService.ParseReplacedProcessId(args));
+    }
+
+    public static TheoryData<string[]> ArgumentsWithoutAProcessId() =>
+    [
+        // 평소 실행에는 이 인자가 없다.
+        [],
+        ["--other"],
+
+        // 번호가 빠졌거나 숫자가 아니면 기다릴 대상이 없다.
+        [UpdateService.WaitForArgument],
+        [UpdateService.WaitForArgument, "not-a-number"],
+        [UpdateService.WaitForArgument, "0"],
+        [UpdateService.WaitForArgument, "-5"],
+    ];
+
+    [Theory]
+    [MemberData(nameof(ArgumentsWithoutAProcessId))]
+    public void Without_a_usable_process_id_nothing_is_waited_for(string[] args)
+    {
+        Assert.Null(UpdateService.ParseReplacedProcessId(args));
+    }
+
+    [Fact]
+    public void Waiting_actually_blocks_until_the_named_process_exits()
+    {
+        // 진짜 프로세스로 확인한다. 이 대기가 동작하지 않으면
+        // 업데이트한 새 버전이 예전 인스턴스에 밀려 그대로 죽는다.
+        // timeout 은 콘솔이 없으면 곧바로 실패한다. ping 은 창 없이도 제 시간을 지킨다.
+        using var previous = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = "/c ping -n 3 127.0.0.1",
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+        })!;
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        UpdateService.WaitForReplacedProcess([UpdateService.WaitForArgument, previous.Id.ToString()]);
+        watch.Stop();
+
+        Assert.True(previous.HasExited, "기다렸는데도 예전 프로세스가 아직 살아 있습니다.");
+        Assert.True(watch.Elapsed > TimeSpan.FromSeconds(1),
+            $"기다리지 않고 {watch.Elapsed} 만에 돌아왔습니다.");
+    }
+
+    [Fact]
+    public void Waiting_returns_immediately_when_the_process_is_already_gone()
+    {
+        // 이미 사라진 번호를 줘도 예외 없이 곧바로 돌아와야 한다.
+        var args = new[] { UpdateService.WaitForArgument, "999999" };
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        UpdateService.WaitForReplacedProcess(args);
+        watch.Stop();
+
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"{watch.Elapsed} 만큼 기다렸습니다.");
+    }
+
     // ── 실행 파일 교체 ────────────────────────────────────────
     //
     // 여기가 잘못되면 사용자의 설치본이 사라진다. 실제 파일로 확인한다.
