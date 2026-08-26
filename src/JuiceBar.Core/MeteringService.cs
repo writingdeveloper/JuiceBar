@@ -79,6 +79,54 @@ public sealed class MeteringService : IDisposable
         _history = new HistoryDatabase(Path.Combine(profileStore.DirectoryPath, "history.sqlite"));
 
         _currentMinute = FloorToMinute(DateTimeOffset.UtcNow);
+
+        MigrateProfile();
+    }
+
+    /// <summary>Windows 에너지 미터로 CPU 전력을 읽고 있는지. PawnIO 안내를 띄울지 판단한다.</summary>
+    public bool HasEnergyMeter => _reader.HasEnergyMeter;
+
+    /// <summary>저장된 프로필이 예전 형식이면 지금 형식으로 옮기고 바로 저장한다.</summary>
+    private void MigrateProfile()
+    {
+        var migrated = DeviceProfile.Migrate(Profile);
+        if (ReferenceEquals(migrated, Profile)) return;
+
+        Profile = migrated;
+        _profileStore.Save(migrated);
+    }
+
+    /// <summary>
+    /// 이번 청구 주기의 누적을 지운다.
+    ///
+    /// 요금제를 바꿨거나, 앱을 시험하느라 쌓인 값이 실제 사용량과 어긋났을 때 쓴다.
+    /// 지운 사용량(kWh)을 돌려준다.
+    /// </summary>
+    public double ResetCurrentCycle(DateTimeOffset? asOf = null)
+    {
+        lock (_gate)
+        {
+            var now = asOf ?? DateTimeOffset.UtcNow;
+            var (cycleStart, _) = BillingCycle.Current(Profile.Tariff.BillingCycleStartDay, now);
+
+            // 아직 DB 로 내려가지 않은 현재 분의 몫까지 합쳐서 알려 준다.
+            double removedWattHours = _history.DeleteRange(cycleStart.ToUniversalTime(), now.AddMinutes(1))
+                + _minuteWattHours;
+
+            _minuteWattHours = 0;
+            _minuteWattSum = 0;
+            _minuteSampleCount = 0;
+            _accumulator.Reset();
+
+            // 캐시가 남아 있으면 다음 1초 동안 지운 값이 그대로 다시 보인다.
+            _totals = null;
+
+            // 순간 모드 게이지의 만재 기준도 함께 다시 배우게 한다.
+            Profile = Profile with { ObservedPeakWatts = 0 };
+            _profileStore.Save(Profile);
+
+            return removedWattHours / 1000.0;
+        }
     }
 
     public void Start()
@@ -182,13 +230,16 @@ public sealed class MeteringService : IDisposable
 
         double measured = 0;
         double cpuMeasured = 0;
+        double gpuMeasured = 0;
 
         foreach (var channel in sensors.Channels)
         {
             if (!selection.Contains(channel.Id)) continue;
 
             measured += channel.Watts;
+
             if (channel.Kind == ChannelKind.Cpu) cpuMeasured += channel.Watts;
+            else if (channel.Kind == ChannelKind.Gpu) gpuMeasured += channel.Watts;
         }
 
         var quality = Profile.Calibration.IsCalibrated
@@ -199,7 +250,10 @@ public sealed class MeteringService : IDisposable
         // CPU 몫만 사용률로 메우고, 품질 등급만 낮춘다.
         if (cpuMeasured < 0.5 && sensors.CpuLoadPercent > 0)
         {
-            measured += Profile.Estimation.EstimateCpuWatts(sensors.CpuLoadPercent);
+            double estimated = Profile.Estimation.EstimateCpuWatts(sensors.CpuLoadPercent);
+
+            measured += estimated;
+            cpuMeasured = estimated;
             quality = PowerQuality.Estimated;
         }
 
@@ -229,6 +283,8 @@ public sealed class MeteringService : IDisposable
             MeasuredWatts = measured,
             BaselineWatts = baseline,
             Quality = quality,
+            CpuWatts = cpuMeasured,
+            GpuWatts = gpuMeasured,
             Channels = sensors.Channels,
             OnBattery = sensors.Battery.OnBattery,
             Timestamp = now,
@@ -277,7 +333,8 @@ public sealed class MeteringService : IDisposable
         _minuteWattSum += reading.WallWatts;
         _minuteSampleCount++;
 
-        if (reading.WallWatts > Profile.ObservedPeakWatts)
+        // 센서가 한 번 튀었다고 만재 기준이 영구히 망가지면 안 된다.
+        if (reading.WallWatts > Profile.ObservedPeakWatts && reading.WallWatts < MaxCredibleWatts)
             Profile = Profile with { ObservedPeakWatts = reading.WallWatts };
 
         var minute = FloorToMinute(now);
@@ -394,19 +451,29 @@ public sealed class MeteringService : IDisposable
         };
     }
 
+    /// <summary>가정용 PC 한 대가 이 이상을 쓸 수는 없다. 센서가 튄 값을 걸러 내는 선이다.</summary>
+    private const double MaxCredibleWatts = 2000;
+
+    /// <summary>
+    /// 순간 모드 게이지의 최소 만재 기준.
+    ///
+    /// 아직 아무것도 관측하지 못했거나 저전력 기기라면, 지금 값이 곧 최고 기록이라
+    /// 게이지가 늘 가득 찬 것처럼 보인다. 바닥을 두어 그런 착시를 막는다.
+    /// </summary>
+    private const double MinimumGaugeFullScaleWatts = 60;
+
     private double ComputeGaugeFraction(PowerReading reading, double cycleCost)
     {
+        double fullScale = Math.Max(MinimumGaugeFullScaleWatts, Profile.ObservedPeakWatts);
+
         if (Profile.GaugeMode == GaugeMode.Instant)
-        {
-            double peak = Math.Max(1, Profile.ObservedPeakWatts);
-            return Math.Clamp(reading.WallWatts / peak, 0, 1);
-        }
+            return Math.Clamp(reading.WallWatts / fullScale, 0, 1);
 
         double budget = Profile.Tariff.MonthlyBudget;
 
         // 예산을 정하지 않았으면 채울 기준이 없다. 순간 전력으로 대신 그린다.
         if (budget <= 0)
-            return Math.Clamp(reading.WallWatts / Math.Max(1, Profile.ObservedPeakWatts), 0, 1);
+            return Math.Clamp(reading.WallWatts / fullScale, 0, 1);
 
         return Math.Clamp(cycleCost / budget, 0, 1);
     }

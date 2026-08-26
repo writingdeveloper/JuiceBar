@@ -94,6 +94,10 @@ public sealed class TrayApp : IDisposable
     {
         if (PawnIoDetector.IsInstalled()) return;
 
+        // Windows 에너지 미터가 CPU 를 재고 있으면 PawnIO 는 없어도 된다.
+        // 필요 없는 커널 드라이버를 깔라고 권하는 것만큼 나쁜 첫인상도 없다.
+        if (_metering.HasEnergyMeter) return;
+
         PromptForPawnIo();
     }
 
@@ -253,7 +257,6 @@ public sealed class TrayApp : IDisposable
         {
             _popup = new PopupWindow(_metering);
             _popup.SettingsRequested += (_, _) => ShowSettings();
-            _popup.CalibrationRequested += (_, _) => ShowCalibration();
             _popup.RateWizardRequested += (_, _) => ShowRateWizard();
             _popup.ExitRequested += (_, _) => Shutdown();
         }

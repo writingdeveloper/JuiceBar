@@ -22,6 +22,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- 머리말 -->
@@ -76,8 +77,19 @@
             </StackPanel>
         </Grid>
 
+        <!--
+            무엇이 전기를 먹고 있는지 한 줄로.
+            게이지는 총합만 보여 주므로, GPU 가 도는 중인지 CPU 가 도는 중인지는 여기서 갈린다.
+        -->
+        <TextBlock Grid.Row="2"
+                   x:Name="BreakdownText"
+                   Style="{StaticResource CaptionText}"
+                   Foreground="{DynamicResource TextTertiaryBrush}"
+                   HorizontalAlignment="Center"
+                   Margin="0,7,0,0" />
+
         <!-- 이번 주기 누적 요금 — 계량기처럼 계속 올라간다 -->
-        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,10,0,0">
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,10,0,0">
             <StackPanel>
                 <Grid>
                     <TextBlock x:Name="CycleLabel" Text="{ui:Translate popup.cycleTotal}" Style="{StaticResource LabelText}" />
@@ -153,7 +165,7 @@
         </Border>
 
         <!-- 최근 추이 -->
-        <Grid Grid.Row="3" Margin="0,12,0,0">
+        <Grid Grid.Row="4" Margin="0,12,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="44" />
@@ -169,7 +181,7 @@
         </Grid>
 
         <!-- 누진 구간 경고 (해당할 때만 보인다) -->
-        <Border Grid.Row="4"
+        <Border Grid.Row="5"
                 x:Name="WarningCard"
                 Background="{DynamicResource WarningBackgroundBrush}"
                 CornerRadius="8"
@@ -183,7 +195,7 @@
         </Border>
 
         <!-- 새 버전 알림 (있을 때만 보인다) -->
-        <Border Grid.Row="5"
+        <Border Grid.Row="6"
                 x:Name="UpdateCard"
                 Background="{DynamicResource CardBrush}"
                 CornerRadius="8"
@@ -218,7 +230,7 @@
         </Border>
 
         <!-- 측정 품질 배지 -->
-        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="2,12,0,0">
+        <StackPanel Grid.Row="7" Orientation="Horizontal" Margin="2,12,0,0">
             <Ellipse x:Name="QualityDot" Width="7" Height="7" VerticalAlignment="Center" />
             <TextBlock x:Name="QualityText"
                        Style="{StaticResource LabelText}"
@@ -227,23 +239,18 @@
                        VerticalAlignment="Center" />
         </StackPanel>
 
-        <!-- 꼬리말 -->
-        <Grid Grid.Row="7" Margin="0,14,0,0">
+        <!--
+            꼬리말.
+            예전에는 여기에 보정·종료 버튼도 있었다. 둘 다 트레이 아이콘을 오른쪽 클릭하면
+            나오는 메뉴에 그대로 있고, 상주 앱에서 종료를 찾는 자리도 원래 거기다.
+            매번 보는 화면에서 가끔 쓰는 버튼을 덜어 냈다.
+        -->
+        <Grid Grid.Row="8" Margin="0,14,0,0">
             <Button x:Name="RateButton"
                     Content="{ui:Translate popup.rateButton}"
                     Style="{StaticResource AccentButton}"
                     HorizontalAlignment="Left"
                     Click="OnOpenRateWizard" />
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="{ui:Translate popup.calibrate}"
-                        Style="{StaticResource SubtleButton}"
-                        ToolTip="{ui:Translate popup.calibrateTip}"
-                        Click="OnOpenCalibration" />
-                <Button Content="{ui:Translate popup.exit}"
-                        Style="{StaticResource SubtleButton}"
-                        Click="OnExit" />
-            </StackPanel>
         </Grid>
     </Grid>
 </Window>

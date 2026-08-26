@@ -23,7 +23,6 @@ public partial class PopupWindow : Window
     private readonly DispatcherTimer _ticker;
 
     public event EventHandler? SettingsRequested;
-    public event EventHandler? CalibrationRequested;
     public event EventHandler? RateWizardRequested;
     public event EventHandler? ExitRequested;
 
@@ -116,6 +115,7 @@ public partial class PopupWindow : Window
         var tariff = snapshot.Tariff;
 
         UpdateGauge(snapshot);
+        UpdateBreakdown(snapshot.Power);
         UpdateTotals(snapshot, tariff);
         UpdateWarning(snapshot, tariff);
         UpdateQualityBadge(snapshot.Power);
@@ -145,6 +145,28 @@ public partial class PopupWindow : Window
 
             GaugeCaption.Text = Loc.T("popup.budgetUsed", percent.ToString("N0"), budget);
         }
+    }
+
+    /// <summary>
+    /// 총합만으로는 지금 무엇이 전기를 먹는지 알 수 없다. CPU·GPU·나머지를 한 줄로 갈라 준다.
+    ///
+    /// "나머지"는 잴 수 없어서 모델로 메우는 몫이다 — 메인보드·RAM·SSD·팬과 파워서플라이 손실.
+    /// 값이 0 인 항목은 빼서 노트북처럼 외장 GPU 가 없는 기기에서 줄이 지저분해지지 않게 한다.
+    /// </summary>
+    private void UpdateBreakdown(PowerReading power)
+    {
+        var parts = new List<string>(3);
+
+        if (power.CpuWatts >= 0.5)
+            parts.Add(Loc.T("popup.part.cpu", CurrencyFormatter.FormatWatts(power.CpuWatts)));
+
+        if (power.GpuWatts >= 0.5)
+            parts.Add(Loc.T("popup.part.gpu", CurrencyFormatter.FormatWatts(power.GpuWatts)));
+
+        if (power.OtherWatts >= 0.5)
+            parts.Add(Loc.T("popup.part.other", CurrencyFormatter.FormatWatts(power.OtherWatts)));
+
+        BreakdownText.Text = string.Join("   ·   ", parts);
     }
 
     private void UpdateTotals(MeteringSnapshot snapshot, Core.Tariff.TariffConfig tariff)
@@ -296,12 +318,6 @@ public partial class PopupWindow : Window
         SettingsRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnOpenCalibration(object sender, RoutedEventArgs e)
-    {
-        Hide();
-        CalibrationRequested?.Invoke(this, EventArgs.Empty);
-    }
-
     private void OnOpenRateWizard(object sender, RoutedEventArgs e)
     {
         Hide();
@@ -359,7 +375,4 @@ public partial class PopupWindow : Window
 
     private static void OpenInBrowser(string url)
         => Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-
-    private void OnExit(object sender, RoutedEventArgs e)
-        => ExitRequested?.Invoke(this, EventArgs.Empty);
 }

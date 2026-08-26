@@ -67,6 +67,35 @@
                     </StackPanel>
                 </Border>
 
+                <!--
+                    ─── 이번 주기 ───
+                    저장을 눌러야 적용되는 설정이 아니라 바로 실행되는 동작이다.
+                    되돌릴 수 없으므로 누른 뒤에 한 번 더 묻는다.
+                -->
+                <TextBlock Text="{ui:Translate settings.cycle}" Style="{StaticResource SectionTitle}" Margin="2,22,0,7" />
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock x:Name="CycleUsageText"
+                                   Style="{StaticResource CaptionText}"
+                                   TextWrapping="Wrap"
+                                   LineHeight="19" />
+
+                        <TextBlock Style="{StaticResource LabelText}"
+                                   FontWeight="Normal"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0"
+                                   Text="{ui:Translate settings.resetHint}" />
+
+                        <Button x:Name="ResetCycleButton"
+                                Content="{ui:Translate settings.resetCycle}"
+                                Style="{StaticResource SubtleButton}"
+                                HorizontalAlignment="Left"
+                                Margin="0,10,0,0"
+                                Click="OnResetCycle" />
+                    </StackPanel>
+                </Border>
+
                 <!-- ─── 게이지 ─── -->
                 <TextBlock Text="{ui:Translate settings.gauge}" Style="{StaticResource SectionTitle}" Margin="2,22,0,7" />
 

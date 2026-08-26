@@ -59,14 +59,20 @@ public sealed record PowerReading
 
     public required DateTimeOffset Timestamp { get; init; }
 
-    public double CpuWatts => SumOf(ChannelKind.Cpu);
-    public double GpuWatts => SumOf(ChannelKind.Gpu);
+    /// <summary>
+    /// 합산에 포함된 CPU 채널의 합.
+    ///
+    /// <see cref="Channels"/> 를 그냥 훑어서는 안 된다 — 그 목록에는 고르지 않은 채널도
+    /// 들어 있어서(코어별 센서, 쓰지 않는 쪽의 CPU 소스) 같은 전력이 여러 번 잡힌다.
+    /// </summary>
+    public required double CpuWatts { get; init; }
 
-    private double SumOf(ChannelKind kind)
-    {
-        double total = 0;
-        foreach (var c in Channels)
-            if (c.Kind == kind) total += c.Watts;
-        return total;
-    }
+    /// <summary>합산에 포함된 GPU 채널의 합.</summary>
+    public required double GpuWatts { get; init; }
+
+    /// <summary>
+    /// CPU 도 GPU 도 아닌 몫. 메인보드·RAM·SSD·팬과 파워서플라이 손실이 여기 들어간다.
+    /// 잴 수 없어서 모델로 메우는 부분이므로 따로 떼어 보여 준다.
+    /// </summary>
+    public double OtherWatts => Math.Max(0, WallWatts - CpuWatts - GpuWatts);
 }

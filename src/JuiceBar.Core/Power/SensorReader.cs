@@ -26,7 +26,14 @@ public sealed class SensorReader : IDisposable
 {
     private readonly Computer _computer;
     private readonly UpdateVisitor _visitor = new();
+    private readonly EnergyMeterReader _energyMeter = new();
     private bool _disposed;
+
+    /// <summary>
+    /// Windows 에너지 미터로 CPU 전력을 읽을 수 있는지.
+    /// 이게 참이면 PawnIO 없이도 정밀 측정이 된다.
+    /// </summary>
+    public bool HasEnergyMeter => _energyMeter.IsAvailable;
 
     public SensorReader()
     {
@@ -96,6 +103,10 @@ public sealed class SensorReader : IDisposable
                 CollectFrom(sub);
         }
 
+        // 에너지 미터 채널을 같은 목록에 얹는다. 무엇을 합산할지는 프로필이 정하므로
+        // 여기서는 출처를 가리지 않고 나란히 내놓기만 한다.
+        channels.AddRange(_energyMeter.Read());
+
         return new SensorSnapshot(
             channels,
             new BatteryState(batteryPresent, IsRunningOnBattery(), dischargeWatts, chargeWatts),
@@ -162,16 +173,34 @@ public sealed class SensorReader : IDisposable
     {
         var selected = new HashSet<string>(StringComparer.Ordinal);
 
+        var meterChannels = channels.Where(c => IsEnergyMeterChannel(c.Id)).ToList();
+        var sensorChannels = channels.Where(c => !IsEnergyMeterChannel(c.Id)).ToList();
+
+        // 에너지 미터가 CPU 패키지를 실제로 재고 있는지. 채널이 있어도 0W 만 낸다면
+        // 그건 재는 게 아니다 — 그럴 때 LibreHardwareMonitor 값을 밀어내면 손해다.
+        bool meterMeasuresCpu = meterChannels.Any(c => c.Kind == ChannelKind.Cpu && c.Watts > 0);
+
+        // 에너지 미터 채널은 이미 겹치지 않는 것만 남아 있다(코어별·PP0·PP1 은 걸러 냈다).
+        foreach (var channel in meterChannels)
+        {
+            if (channel.Kind == ChannelKind.Cpu && !meterMeasuresCpu) continue;
+            selected.Add(channel.Id);
+        }
+
         // CPU 패키지 센서가 살아 있으면 내장 GPU 몫은 이미 그 안에 포함돼 있다.
-        bool cpuPackageAvailable = channels.Any(c =>
+        bool cpuPackageAvailable = meterMeasuresCpu || sensorChannels.Any(c =>
             c.Kind == ChannelKind.Cpu && IsPackageSensor(c.Label) && c.Watts > 0);
 
-        foreach (var group in channels.GroupBy(c => c.HardwareName))
+        foreach (var group in sensorChannels.GroupBy(c => c.HardwareName))
         {
             var items = group.ToList();
             var kind = items[0].Kind;
 
             if (kind == ChannelKind.Battery) continue;
+
+            // 에너지 미터와 LibreHardwareMonitor 는 같은 RAPL 카운터를 읽는다.
+            // 둘 다 더하면 CPU 전력을 정확히 두 번 세게 된다.
+            if (kind == ChannelKind.Cpu && meterMeasuresCpu) continue;
 
             if (kind == ChannelKind.Gpu
                 && cpuPackageAvailable
@@ -194,6 +223,10 @@ public sealed class SensorReader : IDisposable
 
         return selected;
     }
+
+    /// <summary>채널이 Windows 에너지 미터에서 온 것인지.</summary>
+    internal static bool IsEnergyMeterChannel(string channelId)
+        => channelId.StartsWith("emi:", StringComparison.Ordinal);
 
     /// <summary>
     /// 이름으로 내장 그래픽을 가려낸다.
@@ -252,6 +285,7 @@ public sealed class SensorReader : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _energyMeter.Dispose();
         _computer.Close();
     }
 

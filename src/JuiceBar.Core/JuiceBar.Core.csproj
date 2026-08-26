@@ -7,6 +7,8 @@
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- 에너지 미터(EMI)는 측정 버퍼를 고정해 DeviceIoControl 에 넘겨야 한다. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

@@ -15,7 +15,8 @@ cycle goes on. Click it and the cost ticks upward in front of you.
 </p>
 
 **[Download the latest release →](https://github.com/writingdeveloper/JuiceBar/releases/latest)**
-One file, no installer, no .NET runtime required.
+One file, no installer, no .NET runtime required — and on most machines, no
+kernel driver either. See [how accurate is it, really](#how-accurate-is-it-really).
 
 ---
 
@@ -70,7 +71,8 @@ it. What hardware sensors report is the power of individual components:
 
 | Component | Source | Available |
 |---|---|---|
-| CPU package | Intel RAPL / AMD SMU, via PawnIO | needs the driver and admin rights |
+| CPU package | Windows energy meter (EMI) | most Windows 10/11 machines, no driver, no admin |
+| CPU package | Intel RAPL / AMD SMU, via PawnIO | fallback where the meter is absent |
 | Discrete GPU | NVIDIA NVML / AMD ADL | always |
 | Battery charge and discharge | ACPI | laptops only |
 | Motherboard, RAM, drives, fans | — | never measurable |
@@ -110,16 +112,43 @@ integrated GPUs by default — and because sensor naming varies by hardware and 
 heuristic will be right everywhere, the settings window shows every channel with
 a running total so you can see the double count and switch it off.
 
-**The CPU driver may be missing.** CPU package power lives behind
-model-specific registers, which need a kernel driver.
-[PawnIO](https://pawnio.eu/) is the signed, open-source one that
-LibreHardwareMonitor uses. Install it and run JuiceBar elevated for real CPU
-numbers. Skip it and JuiceBar still works — GPU power is measured properly and
-the CPU share is estimated from utilisation, which the badge in the popup says
-plainly rather than pretending otherwise.
+**Reading the CPU normally costs you a kernel driver.** Package power lives in
+model-specific registers, and every tool that reads them — LibreHardwareMonitor
+included — needs a ring-0 driver plus administrator rights to get at them. Miss
+either and the CPU reads 0 W, which is half of a desktop's draw.
+
+JuiceBar takes a different route first. Windows exposes the same RAPL counters
+through the [Energy Meter Interface](https://learn.microsoft.com/en-us/windows-hardware/drivers/powermeter/energy-meter-interface),
+a documented user-mode API served by the platform's own power-management driver.
+Measured on a Ryzen 9 7950X with no driver installed and no elevation:
+
+```
+LibreHardwareMonitor  "CPU Package"           0.00 W
+Windows energy meter  "RAPL_Package0_PKG"    66.61 W
+```
+
+Same counter, no driver, no UAC prompt. It also reports *accumulated energy*
+rather than instantaneous power, so spikes between polls land in the total
+instead of being missed.
+
+[PawnIO](https://pawnio.eu/) — the signed, open-source driver
+LibreHardwareMonitor uses — remains the fallback for hardware that exposes no
+energy meter, and JuiceBar only suggests installing it when it is actually
+needed. Where neither is available the CPU share is estimated from utilisation,
+and the badge in the popup says so plainly rather than pretending otherwise.
 
 > The driver PawnIO replaced, WinRing0, is on Microsoft's vulnerable-driver
 > blocklist. JuiceBar never ships it.
+
+**Both sources can read the same watts.** With PawnIO installed, the energy
+meter and LibreHardwareMonitor report the *same* RAPL counter. Adding them would
+double the CPU figure exactly. JuiceBar picks one — the meter, when it is
+actually reporting — and drops the other.
+
+**A stale total outlives its cause.** Change tariff, or leave the app running
+while you test something, and this cycle's total no longer means anything.
+Settings has **Reset this cycle**, which clears what has piled up since the
+cycle started and leaves earlier cycles alone.
 
 ---
 

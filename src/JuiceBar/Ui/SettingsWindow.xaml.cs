@@ -65,6 +65,7 @@ public partial class SettingsWindow : Window
 
         ProfilePathText.Text = Loc.T("settings.profilePath", ProfileDirectory());
 
+        ShowCycleUsage();
         LoadLanguages(profile.Language);
         LoadChannels();
     }
@@ -114,20 +115,65 @@ public partial class SettingsWindow : Window
 
         PawnIoStatus.Text = DescribeSensorAccess();
         ProfilePathText.Text = Loc.T("settings.profilePath", ProfileDirectory());
+        ShowCycleUsage();
 
         // "Windows 설정 따르기" 항목의 이름도 새 언어로 바뀌어야 한다.
         LoadLanguages(choice.Code);
     }
 
     /// <summary>CPU 전력을 실측하고 있는지, 못 한다면 왜 못 하는지.</summary>
-    private static string DescribeSensorAccess()
+    private string DescribeSensorAccess()
     {
+        // 에너지 미터가 답이면 나머지는 물어볼 필요가 없다.
+        // 이미 재고 있는 사람에게 드라이버 설치 안내를 남겨 두면 혼란만 준다.
+        if (_metering.HasEnergyMeter)
+            return Loc.T("settings.sensor.energyMeter");
+
         if (!PawnIoDetector.IsInstalled())
             return Loc.T("settings.sensor.noPawnIo");
 
         return Loc.T(Elevation.IsElevated
             ? "settings.sensor.elevated"
             : "settings.sensor.notElevated");
+    }
+
+    // ─────────────────────── 이번 주기 누적 ───────────────────────
+
+    private void ShowCycleUsage()
+    {
+        if (_metering.Latest is not { } latest)
+        {
+            CycleUsageText.Text = Loc.T("settings.cycleUsageUnknown");
+            return;
+        }
+
+        var tariff = latest.Tariff;
+
+        CycleUsageText.Text = Loc.T(
+            "settings.cycleUsage",
+            CurrencyFormatter.FormatKwh(latest.CycleKwh),
+            CurrencyFormatter.Format(latest.CycleCost.Total, tariff.Currency, tariff.Symbol));
+    }
+
+    /// <summary>
+    /// 이번 청구 주기의 누적을 지운다.
+    ///
+    /// 저장 버튼과 달리 즉시 반영된다. 지운 값을 되살릴 방법이 없으므로 한 번 더 묻는다.
+    /// </summary>
+    private void OnResetCycle(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            Loc.T("settings.resetConfirm"),
+            Loc.T("settings.resetCycle"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (answer != MessageBoxResult.Yes) return;
+
+        double removedKwh = _metering.ResetCurrentCycle();
+
+        ShowCycleUsage();
+        ValidationText.Text = Loc.T("settings.resetDone", CurrencyFormatter.FormatKwh(removedKwh));
     }
 
     private void LoadChannels()

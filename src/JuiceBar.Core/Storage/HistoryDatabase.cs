@@ -159,6 +159,23 @@ public sealed class HistoryDatabase : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// 한 구간의 이력을 지운다. 사용자가 이번 주기 누적을 초기화할 때 쓴다.
+    /// 지워진 사용량(Wh)을 돌려주므로 "얼마를 지웠다"고 알려 줄 수 있다.
+    /// </summary>
+    public double DeleteRange(DateTimeOffset fromUtc, DateTimeOffset toUtc)
+    {
+        double removed = SumWattHours(fromUtc, toUtc);
+
+        using var command = _connection.CreateCommand();
+        command.CommandText = "DELETE FROM minute_samples WHERE minute_utc >= $from AND minute_utc < $to;";
+        command.Parameters.AddWithValue("$from", ToMinuteKey(fromUtc));
+        command.Parameters.AddWithValue("$to", ToMinuteKey(toUtc));
+        command.ExecuteNonQuery();
+
+        return removed;
+    }
+
     /// <summary>오래된 이력을 지운다. 무한정 쌓이지 않게 주기적으로 호출한다.</summary>
     public int Prune(DateTimeOffset olderThanUtc)
     {
